@@ -87,10 +87,10 @@ const Home = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-start">
+    <div className="flex min-h-screen w-full flex-col items-stretch justify-start">
       <Hero title={t('heroHeading')} subtitle={t('heroSubheading')} ctaText={t('orderNow')} />
 
-      <section className="w-full max-w-6xl mx-auto px-4 py-10">
+      <section className="w-full px-5 py-10 sm:px-8 lg:px-12 2xl:px-16">
         <div className="grid items-start gap-6 lg:grid-cols-[1.05fr_0.95fr]">
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60">
             <div className="grid md:grid-cols-[minmax(0,1fr)_280px] lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -116,7 +116,7 @@ const Home = () => {
         </div>
       </section>
 
-      <section className="w-full max-w-6xl mx-auto px-4 py-14 md:py-16">
+      <section className="w-full px-5 py-14 sm:px-8 md:py-16 lg:px-12 2xl:px-16">
         <h2 className="text-2xl font-bold text-white mb-6">Best Selling Items</h2>
         {loadingFeatured ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
@@ -146,7 +146,7 @@ const Home = () => {
         )}
       </section>
 
-      <section className="w-full max-w-6xl mx-auto px-4 pb-16">
+      <section className="w-full px-5 pb-16 sm:px-8 lg:px-12 2xl:px-16">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Customer Love</p>

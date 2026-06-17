@@ -116,7 +116,7 @@ const UserDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-red-950 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto">
+      <div className="w-full px-5 sm:px-8 lg:px-12 2xl:px-16">
         {/* Header */}
         <div className="glass-card p-6 rounded-lg border border-red-900 mb-8">
           <div className="flex justify-between items-start">

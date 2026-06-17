@@ -46,7 +46,7 @@ const OrderTracking = () => {
   }, [order?._id]);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-12">
+    <div className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
       <div className="glass-card rounded-lg border border-red-900 p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
           <div>

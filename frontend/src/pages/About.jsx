@@ -7,7 +7,7 @@ const About = () => {
   const { t } = useContext(AuthContext);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+    <div className="w-full px-5 py-12 sm:px-8 md:py-16 lg:px-12 2xl:px-16">
       <section className="grid items-center gap-8 md:grid-cols-[1.05fr_0.95fr]">
         <div>
           <p className="text-sm font-bold uppercase tracking-widest text-bakery-red">Our Story</p>

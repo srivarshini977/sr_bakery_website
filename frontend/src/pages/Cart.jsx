@@ -7,7 +7,7 @@ const Cart = () => {
   const subtotal = cart.reduce((s, item) => s + item.price * item.quantity, 0);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-12">
+    <div className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
       <h1 className="text-2xl font-bold">{t('navCart')}</h1>
       {cart.length === 0 ? (
         <div className="mt-6 text-gray-300">

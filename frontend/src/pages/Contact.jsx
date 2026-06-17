@@ -33,7 +33,7 @@ const Contact = () => {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 md:py-16">
+    <div className="w-full px-5 py-12 sm:px-8 md:py-16 lg:px-12 2xl:px-16">
       <div className="grid gap-8 md:grid-cols-[0.9fr_1.1fr]">
         <section>
           <p className="text-sm font-bold uppercase tracking-widest text-bakery-red">Visit Us</p>

@@ -157,7 +157,7 @@ const Checkout = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-12">
+    <div className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
       <h1 className="text-2xl font-bold">{t('navCheckout')}</h1>
       <div className="mt-6 grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
         <div className="glass-card rounded-lg p-6">

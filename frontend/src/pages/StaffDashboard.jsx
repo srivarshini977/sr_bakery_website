@@ -373,7 +373,7 @@ const StaffDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-red-950 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto mb-8">
+      <div className="mb-8 w-full">
         <div className="glass-card p-6 rounded-lg border border-red-900">
           <h1 className="text-3xl font-bold text-white">Staff Dashboard</h1>
           <p className="text-gray-400 mt-2">Welcome, <span className="text-red-400 font-bold">{user?.name}</span></p>
@@ -381,7 +381,7 @@ const StaffDashboard = () => {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto">
+      <div className="w-full">
         {!isChef && popupTasks.length > 0 && (
           <div className="mb-6 space-y-3">
             {popupTasks.map((order) => (

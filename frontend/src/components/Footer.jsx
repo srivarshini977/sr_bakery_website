@@ -10,7 +10,7 @@ const Footer = () => {
     <footer className="relative overflow-hidden border-t-2 border-bakery-brown bg-bakery-black pt-12 pb-8 text-gray-400 sm:pt-16">
       <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-transparent via-bakery-red to-transparent" />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-5 sm:px-8 lg:px-12 2xl:px-16">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-4">
             <h3 className="text-xl font-black tracking-wider text-white">

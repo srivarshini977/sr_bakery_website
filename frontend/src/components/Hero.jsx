@@ -12,12 +12,12 @@ const Hero = ({ title, subtitle, ctaText }) => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_35%,rgba(179,0,0,0.28),transparent_34%),linear-gradient(135deg,#0b0b0b_0%,#111_48%,#2b0808_100%)]" />
       <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-bakery-black to-transparent" />
 
-      <div className="relative mx-auto grid min-h-[calc(100svh-5rem)] max-w-7xl grid-cols-1 items-center gap-8 px-4 py-8 sm:px-6 md:grid-cols-[minmax(0,1.02fr)_minmax(300px,0.78fr)] md:py-12 lg:px-10">
+      <div className="relative grid min-h-[calc(100svh-5rem)] w-full grid-cols-1 items-center gap-8 px-5 py-8 sm:px-8 md:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)] md:py-12 lg:px-12 2xl:px-16">
         <motion.div
           initial={{ x: -28, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ duration: 0.7, ease: 'easeOut' }}
-          className="max-w-[720px] pt-2 md:pt-0"
+          className="w-full pt-2 md:pt-0"
         >
           <p className="mb-3 text-[11px] font-black uppercase tracking-[0.22em] text-bakery-gold sm:mb-4 sm:text-xs sm:tracking-[0.28em]">
             SR Bakery - Oddanchatram
@@ -50,7 +50,7 @@ const Hero = ({ title, subtitle, ctaText }) => {
           transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
           className="block"
         >
-          <div className="relative mx-auto aspect-[16/11] w-full overflow-hidden rounded-lg border border-bakery-red/40 bg-zinc-950 shadow-neon-red-strong md:ml-auto md:aspect-[4/5] md:max-h-[620px] md:min-h-[420px]">
+          <div className="relative aspect-[16/11] w-full overflow-hidden rounded-lg border border-bakery-red/40 bg-zinc-950 shadow-neon-red-strong md:ml-auto md:aspect-[5/4] md:min-h-[520px] xl:min-h-[620px]">
             <img
               src={heroImage}
               alt="SR Bakery featured food display"

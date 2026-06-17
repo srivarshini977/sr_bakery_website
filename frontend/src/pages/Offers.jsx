@@ -22,7 +22,7 @@ const Offers = () => {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
+    <div className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
       <h1 className="text-3xl font-bold">{t('navOffers')}</h1>
       {loading ? (
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">

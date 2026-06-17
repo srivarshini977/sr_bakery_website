@@ -21,7 +21,7 @@ const UserOrders = () => {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
+    <div className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
       <h2 className="mb-6 text-2xl font-bold">My Orders</h2>
       {orders.length === 0 ? (
         <div className="glass-card rounded-lg p-8 text-center text-gray-400">No orders yet.</div>

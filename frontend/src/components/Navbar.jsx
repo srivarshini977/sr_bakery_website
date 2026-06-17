@@ -48,7 +48,7 @@ const Navbar = () => {
           : 'bg-bakery-black/80 py-3 backdrop-blur-sm lg:bg-transparent lg:py-5'
       }`}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-5 sm:px-8 lg:px-12 2xl:px-16">
         <div className="flex h-16 items-center justify-between gap-3">
           <Link to="/" className="flex min-w-0 items-center gap-2">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-bakery-red bg-white shadow-[0_0_10px_rgba(179,0,0,0.8)] sm:h-12 sm:w-12">

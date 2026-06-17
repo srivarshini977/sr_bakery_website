@@ -36,7 +36,7 @@ const Gallery = () => {
   ), [products]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
       <div className="mb-8">
         <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Gallery</p>
         <h1 className="mt-2 text-3xl font-black text-white sm:text-4xl">SR Bakery Gallery</h1>
