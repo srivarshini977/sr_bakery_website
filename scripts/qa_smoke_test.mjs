@@ -139,10 +139,14 @@ try {
     token: admin.token,
     body: JSON.stringify({ assignedTo: chef1User._id, assignedRole: 'chef', assignedPerson: 'chef_1' }),
   });
-  const chef1Orders = await request(`/staff/orders/assigned/${chef1.user._id}`, { token: chef1.token });
-  const chef2Orders = await request(`/staff/orders/assigned/${chef2.user._id}`, { token: chef2.token });
-  record('Chef 1 sees assigned order', chef1Orders.data.some((item) => item._id === order._id));
-  record('Chef 2 cannot see Chef 1 order', !chef2Orders.data.some((item) => item._id === order._id));
+  await expectReject('Chef 1 blocked from billing assigned orders', () => request(`/staff/orders/assigned/${chef1.user._id}`, { token: chef1.token }), 403);
+  await expectReject('Chef 2 blocked from billing assigned orders', () => request(`/staff/orders/assigned/${chef2.user._id}`, { token: chef2.token }), 403);
+
+  const chef1Kots = await request('/staff/kots', { token: chef1.token });
+  const chef2Kots = await request('/staff/kots', { token: chef2.token });
+  const chef1Kot = chef1Kots.data.kots.find((item) => item.orderId === order._id);
+  record('Chef 1 sees assigned KOT', Boolean(chef1Kot));
+  record('Chef 2 cannot see Chef 1 KOT', !chef2Kots.data.kots.some((item) => item.orderId === order._id));
 
   await expectReject('Chef 2 cannot update Chef 1 order', () => request(`/orders/${order._id}/status`, {
     method: 'PATCH',
@@ -151,12 +155,12 @@ try {
   }), 403);
 
   for (const status of ['Preparing', 'Packed']) {
-    const update = await request(`/orders/${order._id}/status`, {
+    const update = await request(`/staff/kots/${chef1Kot._id}/status`, {
       method: 'PATCH',
       token: chef1.token,
       body: JSON.stringify({ status }),
     });
-    record(`Chef 1 updates order to ${status}`, update.data.order.status === status);
+    record(`Chef 1 updates KOT to ${status}`, update.data.kot.status === status);
   }
   for (const status of ['Shipped', 'Delivered']) {
     const update = await request(`/orders/${order._id}/status`, {
@@ -249,8 +253,10 @@ try {
     const Inventory = (await import('../backend/models/Inventory.js')).default;
     const ContactSubmission = (await import('../backend/models/ContactSubmission.js')).default;
     const Review = (await import('../backend/models/Review.js')).default;
+    const KOT = (await import('../backend/models/KOT.js')).default;
     await mongoose.default.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/srbakery');
     await Review.deleteMany({ order: { $in: cleanup.orders } });
+    await KOT.deleteMany({ orderId: { $in: cleanup.orders } });
     await Order.deleteMany({ _id: { $in: cleanup.orders } });
     await Inventory.deleteMany({ _id: { $in: cleanup.inventory } });
     await ContactSubmission.deleteMany({ _id: { $in: cleanup.contactIds } });

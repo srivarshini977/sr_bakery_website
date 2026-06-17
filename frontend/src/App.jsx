@@ -7,12 +7,14 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppButton from './components/WhatsAppButton';
 import FloatingCartAnim from './components/FloatingCartAnim';
+import ScrollToTop from './components/ScrollToTop';
 
 // Pages
 import Home from './pages/Home';
 import About from './pages/About';
 import Menu from './pages/Menu';
 import Offers from './pages/Offers';
+import Gallery from './pages/Gallery';
 import Contact from './pages/Contact';
 import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
@@ -52,6 +54,7 @@ const AppContent = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-bakery-black text-white">
+      <ScrollToTop />
       {!isAdminPanel && <Navbar />}
       {!isAdminPanel && <FloatingCartAnim />}
 
@@ -61,6 +64,7 @@ const AppContent = () => {
           <Route path="/about" element={<About />} />
           <Route path="/menu" element={<Menu />} />
           <Route path="/offers" element={<Offers />} />
+          <Route path="/gallery" element={<Gallery />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/login" element={<Login />} />

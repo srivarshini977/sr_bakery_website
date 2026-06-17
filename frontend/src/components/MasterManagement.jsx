@@ -377,24 +377,33 @@ const MasterManagement = () => {
           <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
             <h3 className="text-xl font-bold text-white">Menu Photo Preview</h3>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {products.map((product) => (
-                <article key={product._id} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-black">
-                    <img
-                      src={resolveMediaUrl(product.image)}
-                      alt={product.name}
-                      className="absolute inset-0 block h-full w-full object-cover object-center"
-                      onError={(event) => {
-                        event.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                  <div className="p-3">
-                    <p className="line-clamp-1 font-bold text-white">{product.name}</p>
-                    <p className="text-xs text-gray-500">{product.image || 'No image saved'}</p>
-                  </div>
-                </article>
-              ))}
+              {products.map((product) => {
+                const image = resolveMediaUrl(product.image);
+                return (
+                  <article key={product._id} className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+                    <div className="relative aspect-[4/3] overflow-hidden bg-black">
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={product.name}
+                          className="absolute inset-0 block h-full w-full object-cover object-center"
+                          onError={(event) => {
+                            event.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-zinc-950 text-xs font-bold uppercase tracking-widest text-gray-500">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="line-clamp-1 font-bold text-white">{product.name}</p>
+                      <p className="text-xs text-gray-500">{product.image || 'No image saved'}</p>
+                    </div>
+                  </article>
+                );
+              })}
               {products.length === 0 && <p className="col-span-full rounded-lg border border-zinc-800 p-6 text-center text-gray-500">Create menu items first.</p>}
             </div>
           </div>

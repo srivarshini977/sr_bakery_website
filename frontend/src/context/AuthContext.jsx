@@ -48,6 +48,14 @@ export const AuthProvider = ({ children }) => {
     return savedWish ? JSON.parse(savedWish) : [];
   });
 
+  const logout = () => {
+    localStorage.removeItem('sr_bakery_token');
+    localStorage.removeItem('sr_bakery_cart');
+    setToken('');
+    setUser(null);
+    setCart([]);
+  };
+
   useEffect(() => {
     const fetchUser = async () => {
       if (!token) {
@@ -58,7 +66,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const res = await API.get('/auth/me');
         setUser(res.data.data.user);
-      } catch (err) {
+      } catch (_err) {
         console.error('Session expired or invalid token');
         logout();
       } finally {
@@ -99,14 +107,6 @@ export const AuthProvider = ({ children }) => {
     setToken(newToken);
     setUser(data.user);
     return data.user;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('sr_bakery_token');
-    localStorage.removeItem('sr_bakery_cart');
-    setToken('');
-    setUser(null);
-    setCart([]);
   };
 
   const addToCart = (product, quantity = 1) => {

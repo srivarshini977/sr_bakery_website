@@ -64,14 +64,23 @@ const AdminImageUpload = () => {
       </form>
 
       <div className="grid grid-cols-3 gap-4 mt-8">
-        {products.map(p=> (
-          <div key={p._id} className="glass-card p-2 rounded">
-            <div className="relative h-36 w-full overflow-hidden rounded bg-black">
-              <img src={resolveMediaUrl(p.image)} alt={p.name} className="absolute inset-0 h-full w-full object-cover object-center" />
+        {products.map((p) => {
+          const image = resolveMediaUrl(p.image);
+          return (
+            <div key={p._id} className="glass-card p-2 rounded">
+              <div className="relative h-36 w-full overflow-hidden rounded bg-black">
+                {image ? (
+                  <img src={image} alt={p.name} className="absolute inset-0 h-full w-full object-cover object-center" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center bg-zinc-900 text-xs font-bold uppercase tracking-widest text-gray-500">
+                    No image
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 text-sm font-bold">{p.name}</div>
             </div>
-            <div className="mt-2 text-sm font-bold">{p.name}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

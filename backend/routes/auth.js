@@ -2,13 +2,17 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { protect } from '../middleware/auth.js';
+import dotenv from 'dotenv';
 
+dotenv.config();
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'srbakerysupersecretkey123456';
 const JWT_EXPIRES_IN = '7d';
 
 const signToken = (id) => {
-  return jwt.sign({ id }, JWT_SECRET, {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET environment variable is required');
+  }
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN
   });
 };
