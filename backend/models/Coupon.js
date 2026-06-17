@@ -16,6 +16,10 @@ const couponSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  bannerImage: {
+    type: String,
+    default: ''
+  },
   occasion: {
     type: String,
     default: ''

@@ -4,12 +4,26 @@ import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
 import { LocateFixed, MapPin, Truck } from 'lucide-react';
 
+const loadRazorpayScript = () => new Promise((resolve) => {
+  if (window.Razorpay) {
+    resolve(true);
+    return;
+  }
+
+  const script = document.createElement('script');
+  script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+  script.onload = () => resolve(true);
+  script.onerror = () => resolve(false);
+  document.body.appendChild(script);
+});
+
 const Checkout = () => {
   const { cart, user, clearCart, t } = useContext(AuthContext);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [orderType, setOrderType] = useState('takeaway');
+  const [paymentMethod, setPaymentMethod] = useState('cash');
   const [address, setAddress] = useState({
     houseNumber: '',
     street: '',
@@ -22,8 +36,9 @@ const Checkout = () => {
   const [deliveryError, setDeliveryError] = useState('');
 
   const itemsTotal = useMemo(() => cart.reduce((s, i) => s + i.price * i.quantity, 0), [cart]);
+  const taxAmount = Number((itemsTotal * 0.05).toFixed(2));
   const deliveryCharge = orderType === 'delivery' && deliveryResult?.deliveryAvailable ? Number(deliveryResult.deliveryCharge || 0) : 0;
-  const payableTotal = itemsTotal + deliveryCharge;
+  const payableTotal = Math.round(itemsTotal + taxAmount + deliveryCharge);
   const fullAddress = useMemo(() => (
     [address.houseNumber, address.street, address.area, address.city, address.pincode].filter(Boolean).join(', ')
   ), [address]);
@@ -114,6 +129,89 @@ const Checkout = () => {
     );
   };
 
+  const buildOrderPayload = () => ({
+    userId: user?._id || null,
+    items: cart.map(i => ({ product: i._id, name: i.name, quantity: i.quantity, price: i.price })),
+    totalAmount: payableTotal,
+    paymentMethod,
+    orderType,
+    customerAddress: {
+      ...address,
+      fullAddress
+    },
+    deliveryAddress: fullAddress,
+    customerLatitude: location.latitude || deliveryResult?.customerLatitude || undefined,
+    customerLongitude: location.longitude || deliveryResult?.customerLongitude || undefined
+  });
+
+  const handleRazorpayPayment = async (orderPayload) => {
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      throw new Error('Unable to load Razorpay checkout. Check your internet connection and try again.');
+    }
+
+    const gatewayOrder = await API.post('/razorpay/create-order', {
+      amount: payableTotal,
+      currency: 'INR'
+    });
+    const paymentOrder = gatewayOrder.data.data;
+
+    return new Promise((resolve, reject) => {
+      const razorpay = new window.Razorpay({
+        key: paymentOrder.keyId,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency,
+        name: 'SR Bakery',
+        description: `Order total Rs. ${payableTotal}`,
+        order_id: paymentOrder.razorpayOrderId,
+        prefill: {
+          name: user?.name || '',
+          email: user?.email || '',
+          contact: user?.phone || ''
+        },
+        notes: {
+          orderType,
+          customerId: user?._id || ''
+        },
+        handler: async (response) => {
+          try {
+            const verification = await API.post('/razorpay/verify-payment', {
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              orderPayload
+            });
+            resolve(verification.data.data);
+          } catch (error) {
+            reject(error);
+          }
+        },
+        modal: {
+          ondismiss: async () => {
+            await API.post('/razorpay/payment-failed', {
+              razorpayOrderId: paymentOrder.razorpayOrderId,
+              reason: 'Customer closed payment popup'
+            }).catch(() => {});
+            reject(new Error('Payment was cancelled.'));
+          }
+        },
+        theme: {
+          color: '#dc0000'
+        }
+      });
+
+      razorpay.on('payment.failed', async (response) => {
+        await API.post('/razorpay/payment-failed', {
+          razorpayOrderId: paymentOrder.razorpayOrderId,
+          reason: response.error?.description || 'Payment failed'
+        }).catch(() => {});
+        reject(new Error(response.error?.description || 'Payment failed. Please try again.'));
+      });
+
+      razorpay.open();
+    });
+  };
+
   const handlePlaceOrder = async () => {
     if (!user || user.role !== 'customer') {
       navigate('/login');
@@ -129,20 +227,16 @@ const Checkout = () => {
 
     setLoading(true);
     try {
-      const orderPayload = {
-        userId: user?._id || null,
-        items: cart.map(i => ({ product: i._id, name: i.name, quantity: i.quantity, price: i.price })),
-        totalAmount: itemsTotal,
-        paymentMethod: 'cash',
-        orderType,
-        customerAddress: {
-          ...address,
-          fullAddress
-        },
-        deliveryAddress: fullAddress,
-        customerLatitude: location.latitude || deliveryResult?.customerLatitude || undefined,
-        customerLongitude: location.longitude || deliveryResult?.customerLongitude || undefined
-      };
+      const orderPayload = buildOrderPayload();
+      if (paymentMethod === 'razorpay') {
+        const paymentResult = await handleRazorpayPayment(orderPayload);
+        const createdOrder = paymentResult?.order;
+        clearCart();
+        alert(`Payment Successful\nPayment ID: ${paymentResult?.paymentId}\nOrder Number: ${paymentResult?.orderNumber}`);
+        if (createdOrder?._id) navigate(`/orders/${createdOrder._id}`);
+        return;
+      }
+
       const res = await API.post('/orders', orderPayload);
       const createdOrder = res.data.data?.order;
       clearCart();
@@ -150,7 +244,7 @@ const Checkout = () => {
       if (createdOrder?._id) navigate(`/orders/${createdOrder._id}`);
     } catch (err) {
       console.error('Checkout failed', err);
-      alert('Checkout failed');
+      alert(err.response?.data?.message || err.message || 'Checkout failed');
     } finally {
       setLoading(false);
     }
@@ -247,12 +341,39 @@ const Checkout = () => {
               )}
             </div>
           )}
+
+          <div className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+            <h2 className="mb-3 font-bold text-white">Payment Method</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {[
+                { value: 'cash', label: 'Cash on Delivery / Counter' },
+                { value: 'razorpay', label: 'Razorpay Online Payment' }
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setPaymentMethod(item.value)}
+                  className={`rounded-lg border px-4 py-3 text-left text-sm font-bold transition ${
+                    paymentMethod === item.value
+                      ? 'border-red-600 bg-red-700 text-white'
+                      : 'border-zinc-700 bg-zinc-900 text-gray-300 hover:bg-zinc-800'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            {paymentMethod === 'razorpay' && (
+              <p className="mt-3 text-sm text-gray-400">UPI, cards, net banking and wallets open in the Razorpay test checkout.</p>
+            )}
+          </div>
         </div>
 
         <div className="glass-card p-6 rounded-lg h-fit">
         <div className="mb-4">Order Summary: {cart.length} items</div>
         <div className="space-y-2 text-sm text-gray-300">
           <div className="flex justify-between"><span>Items</span><span>Rs. {itemsTotal}</span></div>
+          <div className="flex justify-between"><span>GST 5%</span><span>Rs. {taxAmount}</span></div>
           {orderType === 'delivery' && <div className="flex justify-between"><span>Delivery Charge</span><span>Rs. {deliveryCharge}</span></div>}
           <div className="flex justify-between border-t border-zinc-700 pt-3 text-lg font-bold text-white"><span>Total</span><span>Rs. {payableTotal}</span></div>
         </div>
@@ -261,7 +382,7 @@ const Checkout = () => {
           disabled={loading || cart.length === 0}
           className="mt-5 w-full px-4 py-3 bg-bakery-red text-white rounded font-bold disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Processing...' : 'Place Order'}
+          {loading ? 'Processing...' : paymentMethod === 'razorpay' ? `Pay Rs. ${payableTotal}` : 'Place Order'}
         </button>
         </div>
       </div>

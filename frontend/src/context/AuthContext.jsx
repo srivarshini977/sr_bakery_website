@@ -47,13 +47,18 @@ export const AuthProvider = ({ children }) => {
     const savedWish = localStorage.getItem('sr_bakery_wishlist');
     return savedWish ? JSON.parse(savedWish) : [];
   });
+  const [wishlistItems, setWishlistItems] = useState([]);
+  const [toast, setToast] = useState('');
 
   const logout = () => {
     localStorage.removeItem('sr_bakery_token');
     localStorage.removeItem('sr_bakery_cart');
+    localStorage.removeItem('sr_bakery_wishlist');
     setToken('');
     setUser(null);
     setCart([]);
+    setWishlist([]);
+    setWishlistItems([]);
   };
 
   useEffect(() => {
@@ -77,6 +82,33 @@ export const AuthProvider = ({ children }) => {
     fetchUser();
   }, [token]);
 
+  const showToast = (message) => {
+    setToast(message);
+    window.clearTimeout(window.__srToastTimer);
+    window.__srToastTimer = window.setTimeout(() => setToast(''), 1800);
+  };
+
+  const refreshWishlist = async () => {
+    if (!token || !user || user.role !== 'customer') {
+      setWishlist([]);
+      setWishlistItems([]);
+      return [];
+    }
+
+    const response = await API.get('/wishlist');
+    const items = response.data.data?.wishlist || [];
+    setWishlistItems(items);
+    setWishlist(items.map((item) => item._id));
+    localStorage.setItem('sr_bakery_wishlist', JSON.stringify(items.map((item) => item._id)));
+    return items;
+  };
+
+  useEffect(() => {
+    if (!loading) {
+      refreshWishlist().catch((error) => console.error('Unable to load wishlist:', error));
+    }
+  }, [loading, token, user?._id, user?.role]);
+
   useEffect(() => {
     localStorage.setItem('sr_bakery_cart', JSON.stringify(cart));
   }, [cart]);
@@ -86,10 +118,6 @@ export const AuthProvider = ({ children }) => {
       setCart([]);
     }
   }, [loading, user]);
-
-  useEffect(() => {
-    localStorage.setItem('sr_bakery_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
 
   const signup = async (name, email, phone, password, address) => {
     const res = await API.post('/auth/signup', { name, email, phone, password, address });
@@ -145,10 +173,22 @@ export const AuthProvider = ({ children }) => {
     setCart([]);
   };
 
-  const toggleWishlist = (productId) => {
-    setWishlist((prevWish) =>
-      prevWish.includes(productId) ? prevWish.filter((id) => id !== productId) : [...prevWish, productId]
-    );
+  const toggleWishlist = async (productId) => {
+    if (!user || user.role !== 'customer') {
+      return { ok: false, message: 'Login to use wishlist' };
+    }
+
+    const isWishlisted = wishlist.includes(productId);
+    const response = isWishlisted
+      ? await API.delete(`/wishlist/remove/${productId}`)
+      : await API.post('/wishlist/add', { productId });
+    const items = response.data.data?.wishlist || [];
+    const ids = items.map((item) => item._id);
+    setWishlistItems(items);
+    setWishlist(ids);
+    localStorage.setItem('sr_bakery_wishlist', JSON.stringify(ids));
+    showToast(isWishlisted ? 'Removed from Wishlist' : 'Added to Wishlist');
+    return { ok: true, wishlisted: !isWishlisted };
   };
 
   const t = (key) => dictionary[key] || key;
@@ -169,9 +209,19 @@ export const AuthProvider = ({ children }) => {
         updateCartQty,
         clearCart,
         wishlist,
+        wishlistItems,
+        wishlistCount: wishlist.length,
         toggleWishlist,
+        refreshWishlist,
+        toast,
+        showToast,
       }}
     >
+      {toast && (
+        <div className="fixed right-5 top-24 z-[80] rounded-lg border border-red-800 bg-zinc-950 px-4 py-3 text-sm font-bold text-white shadow-2xl shadow-black/50">
+          {toast}
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );

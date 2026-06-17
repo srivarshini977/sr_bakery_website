@@ -55,10 +55,15 @@ const FeaturedImage = ({ item, special = false, className = '', placeholderClass
   );
 };
 
+const formatOfferDiscount = (offer) => (
+  offer.discountType === 'percentage' ? `${offer.discountValue}% OFF` : `Rs. ${offer.discountValue} OFF`
+);
+
 const Home = () => {
   const { t } = useContext(AuthContext);
   const [featuredItems, setFeaturedItems] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [loadingFeatured, setLoadingFeatured] = useState(true);
 
   useEffect(() => {
@@ -76,6 +81,9 @@ const Home = () => {
     API.get('/reviews/public')
       .then((response) => setReviews(response.data.data?.reviews || []))
       .catch((error) => console.error('Failed to fetch reviews:', error));
+    API.get('/products/dynamic/offers')
+      .then((response) => setOffers(response.data.data?.offers || []))
+      .catch((error) => console.error('Failed to fetch offers:', error));
   }, []);
 
   const todaySpecial = featuredItems[0];
@@ -115,6 +123,41 @@ const Home = () => {
           </div>
         </div>
       </section>
+
+      {offers.length > 0 && (
+        <section className="w-full px-5 py-12 sm:px-8 lg:px-12 2xl:px-16">
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Live Offers</p>
+              <h2 className="mt-2 text-2xl font-bold text-white">Fresh Deals Today</h2>
+            </div>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3">
+            {offers.slice(0, 3).map((offer) => {
+              const banner = resolveMediaUrl(offer.bannerImage);
+              return (
+                <article key={offer._id || offer.title} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60">
+                  <div className="aspect-[16/9] bg-zinc-900">
+                    {banner ? (
+                      <img src={banner} alt={offer.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-red-950 to-zinc-950 text-2xl font-black text-white">
+                        {formatOfferDiscount(offer)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-5">
+                    <p className="text-xs font-black uppercase tracking-widest text-bakery-gold">{formatOfferDiscount(offer)}</p>
+                    <h3 className="mt-2 text-lg font-black text-white">{offer.title}</h3>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-300">{offer.description}</p>
+                    {offer.expiryDate && <p className="mt-3 text-xs font-bold text-gray-500">Valid till {new Date(offer.expiryDate).toLocaleDateString()}</p>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="w-full px-5 py-14 sm:px-8 md:py-16 lg:px-12 2xl:px-16">
         <h2 className="text-2xl font-bold text-white mb-6">Best Selling Items</h2>

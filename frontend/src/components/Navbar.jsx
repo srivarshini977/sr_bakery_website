@@ -1,12 +1,12 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { Award, LogOut, Menu, Shield, ShoppingCart, User, X } from 'lucide-react';
+import { Award, Heart, LogOut, Menu, Shield, ShoppingCart, User, X } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import bakeryLogo from '../assets/sr-bakery-logo.svg';
 
 const Navbar = () => {
-  const { user, logout, t, cart } = useContext(AuthContext);
+  const { user, logout, t, cart, wishlistCount } = useContext(AuthContext);
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
@@ -88,6 +88,15 @@ const Navbar = () => {
                 </span>
               )}
             </Link>
+            {user?.role === 'customer' && (
+              <Link to="/wishlist" className="relative inline-flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-bold text-gray-300 transition hover:bg-white/5 hover:text-bakery-red">
+                <Heart size={20} />
+                <span>Wishlist</span>
+                {wishlistCount > 0 && (
+                  <span className="rounded-full bg-bakery-red px-2 py-0.5 text-[10px] font-black text-white">{wishlistCount}</span>
+                )}
+              </Link>
+            )}
 
             {user ? (
               <div className="flex items-center gap-3">
@@ -133,6 +142,16 @@ const Navbar = () => {
                 </span>
               )}
             </Link>
+            {user?.role === 'customer' && (
+              <Link to="/wishlist" className="relative p-1 text-gray-300 hover:text-bakery-red" aria-label="Wishlist">
+                <Heart size={22} />
+                {wishlistCount > 0 && (
+                  <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full border border-bakery-black bg-bakery-red px-1 text-[9px] font-black text-white">
+                    {wishlistCount}
+                  </span>
+                )}
+              </Link>
+            )}
             <button onClick={() => setIsOpen((open) => !open)} className="p-1 text-gray-300 hover:text-white" aria-label="Toggle navigation menu">
               {isOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
@@ -164,6 +183,12 @@ const Navbar = () => {
                   <User size={16} />
                   <span>My Account</span>
                 </Link>
+                {user.role === 'customer' && (
+                  <Link to="/wishlist" className="flex items-center gap-2 py-1 text-sm text-gray-300 hover:text-bakery-red">
+                    <Heart size={16} />
+                    <span>Wishlist ({wishlistCount})</span>
+                  </Link>
+                )}
                 {user.role === 'admin' && (
                   <Link to="/admin" className="flex items-center gap-2 py-1 text-sm font-bold text-bakery-red">
                     <Shield size={16} />

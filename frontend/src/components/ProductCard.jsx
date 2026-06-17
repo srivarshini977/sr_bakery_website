@@ -52,6 +52,18 @@ const ProductCard = ({ product }) => {
     return maps[category] || 'from-zinc-800 to-zinc-950';
   };
 
+  const handleWishlist = async () => {
+    if (!user || user.role !== 'customer') {
+      navigate('/login');
+      return;
+    }
+    try {
+      await toggleWishlist(product._id);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Unable to update wishlist');
+    }
+  };
+
   const primaryImage = resolveMediaUrl(product.image || product.imageUrl || (product.images && product.images[0]) || '');
   const imgSrc = imageFailed ? '' : primaryImage;
   const isStarred = wishlist.includes(product._id);
@@ -69,7 +81,7 @@ const ProductCard = ({ product }) => {
       </span>
 
       <button
-        onClick={() => toggleWishlist(product._id)}
+        onClick={handleWishlist}
         className="absolute right-3 top-3 z-10 rounded-full bg-bakery-black/60 p-2 text-gray-400 backdrop-blur transition-all hover:bg-bakery-black/80 hover:text-bakery-red active:scale-90"
         aria-label="Toggle wishlist"
       >

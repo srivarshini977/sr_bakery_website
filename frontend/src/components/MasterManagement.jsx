@@ -9,7 +9,7 @@ const emptyForms = {
   category: { name: '', description: '', sortOrder: 0, active: true },
   staff: { name: '', email: '', phone: '', password: 'Staff@123', staffRole: 'chef', staffPerson: '' },
   vendor: { name: '', contactPerson: '', phone: '', email: '', address: '', deliverySchedule: 'Weekly', supplierProducts: [] },
-  coupon: { code: '', title: '', occasion: '', description: '', discountType: 'percentage', discountValue: 10, minOrderAmount: 0, startDate: '', expiryDate: '', active: true, productIds: [] },
+  coupon: { code: '', title: '', occasion: '', description: '', bannerImage: '', discountType: 'percentage', discountValue: 10, minOrderAmount: 0, startDate: '', expiryDate: '', active: true, productIds: [] },
   role: { name: '', description: '', permissions: ['orders:view'], active: true },
   todaySpecial: { productId: '', image: '', title: '', description: '', active: true },
   bakery: { name: 'SR Bakery', phone: '', email: '', address: '', workingHours: '8:00 AM - 10:00 PM' },
@@ -465,6 +465,7 @@ const MasterManagement = () => {
               <input className={inputClass} placeholder="Offer title, e.g. Diwali Special" value={forms.coupon.title} onChange={(e) => setForm('coupon', { title: e.target.value })} />
               <input className={inputClass} placeholder="Occasion" value={forms.coupon.occasion} onChange={(e) => setForm('coupon', { occasion: e.target.value })} />
               <textarea className={inputClass} placeholder="Description" value={forms.coupon.description} onChange={(e) => setForm('coupon', { description: e.target.value })} />
+              <input className={inputClass} placeholder="Offer banner image URL or /uploads path" value={forms.coupon.bannerImage} onChange={(e) => setForm('coupon', { bannerImage: e.target.value })} />
               <select className={inputClass} value={forms.coupon.discountType} onChange={(e) => setForm('coupon', { discountType: e.target.value })}>
                 <option value="percentage">Percentage discount</option>
                 <option value="fixed">Fixed rupees discount</option>
@@ -487,7 +488,7 @@ const MasterManagement = () => {
               <button className={buttonClass} onClick={() => createItem('coupons', 'coupon')}><Plus size={16} /> Save Offer</button>
             </div>
           </div>
-          <EditableTable title="Coupons" rows={data.coupons} columns={['code', 'discountType', 'discountValue', 'minOrderAmount', 'expiryDate', 'active']} endpoint="coupons" updateItem={updateItem} deleteItem={deleteItem} />
+          <EditableTable title="Coupons" rows={data.coupons} columns={['code', 'title', 'description', 'bannerImage', 'discountType', 'discountValue', 'startDate', 'expiryDate', 'active']} endpoint="coupons" updateItem={updateItem} deleteItem={deleteItem} />
         </section>
       )}
 

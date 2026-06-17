@@ -88,7 +88,6 @@ router.get('/dynamic/offers', async (req, res) => {
       const matchedProducts = pricedProducts.filter((product) =>
         coupon.productIds?.some((id) => id.toString() === product._id.toString())
       );
-      if (matchedProducts.length === 0) return null;
       const originalTotal = matchedProducts.reduce((sum, product) => sum + Number(product.originalPrice || product.price || 0), 0);
       const offerTotal = matchedProducts.reduce((sum, product) => sum + Number(product.price || 0), 0);
       return {
@@ -97,8 +96,13 @@ router.get('/dynamic/offers', async (req, res) => {
         code: coupon.code,
         occasion: coupon.occasion,
         description: coupon.description || `${coupon.code} is live today on selected menu items.`,
-        price: offerTotal,
-        originalPrice: originalTotal,
+        bannerImage: coupon.bannerImage || '',
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        status: coupon.active ? 'Active' : 'Inactive',
+        price: offerTotal || null,
+        originalPrice: originalTotal || null,
+        startDate: coupon.startDate,
         expiryDate: coupon.expiryDate,
         productIds: matchedProducts.map((product) => product._id),
         products: matchedProducts.map((product) => ({
@@ -108,7 +112,7 @@ router.get('/dynamic/offers', async (req, res) => {
           originalPrice: product.originalPrice || product.price
         }))
       };
-    }).filter(Boolean);
+    });
 
     res.status(200).json({ status: 'success', data: { offers: couponOffers } });
   } catch (error) {

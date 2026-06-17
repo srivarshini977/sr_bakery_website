@@ -19,6 +19,7 @@ import notificationRoutes from './routes/notifications.js';
 import contactRoutes from './routes/contact.js';
 import reviewRoutes from './routes/reviews.js';
 import masterRoutes from './routes/master.js';
+import wishlistRoutes from './routes/wishlist.js';
 import { rateLimiter, securityHeaders } from './middleware/security.js';
 import path from 'path';
 
@@ -64,6 +65,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/master', masterRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

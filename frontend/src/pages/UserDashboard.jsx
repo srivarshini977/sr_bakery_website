@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { CheckCircle2, Clock, Edit2, Mail, Phone, LogOut, Star } from 'lucide-react';
 import API from '../utils/api';
+import { resolveMediaUrl } from '../utils/media';
 
 const orderSteps = ['Pending', 'Confirmed', 'Preparing', 'Packed', 'Shipped', 'Delivered'];
 
@@ -39,6 +40,7 @@ const UserDashboard = () => {
   const [activeTab, setActiveTab] = useState('profile'); // profile, orders, addresses
   const [orders, setOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
@@ -73,6 +75,12 @@ const UserDashboard = () => {
     }
     return undefined;
   }, [token, user?._id]);
+
+  useEffect(() => {
+    API.get('/products/dynamic/offers')
+      .then((response) => setOffers(response.data.data?.offers || []))
+      .catch((error) => console.error('Error fetching dashboard offers:', error));
+  }, []);
 
   // Handle profile update
   const handleUpdateProfile = async () => {
@@ -152,6 +160,33 @@ const UserDashboard = () => {
             </button>
           ))}
         </div>
+
+        {offers.length > 0 && (
+          <div className="mb-6 grid gap-4 md:grid-cols-3">
+            {offers.slice(0, 3).map((offer) => {
+              const banner = resolveMediaUrl(offer.bannerImage);
+              const discount = offer.discountType === 'percentage' ? `${offer.discountValue}% OFF` : `Rs. ${offer.discountValue} OFF`;
+              return (
+                <article key={offer._id || offer.title} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60">
+                  <div className="aspect-[16/9] bg-zinc-900">
+                    {banner ? (
+                      <img src={banner} alt={offer.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-red-950 to-zinc-950 text-xl font-black text-white">
+                        {discount}
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-bakery-gold">{discount}</p>
+                    <h2 className="mt-2 line-clamp-2 text-lg font-black text-white">{offer.title}</h2>
+                    {offer.expiryDate && <p className="mt-2 text-xs font-bold text-gray-500">Valid till {new Date(offer.expiryDate).toLocaleDateString()}</p>}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (

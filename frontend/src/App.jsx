@@ -17,6 +17,7 @@ import Offers from './pages/Offers';
 import Gallery from './pages/Gallery';
 import Contact from './pages/Contact';
 import Cart from './pages/Cart';
+import Wishlist from './pages/Wishlist';
 import Checkout from './pages/Checkout';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -67,6 +68,11 @@ const AppContent = () => {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/cart" element={<Cart />} />
+          <Route path="/wishlist" element={
+            <CustomerProtectedRoute>
+              <Wishlist />
+            </CustomerProtectedRoute>
+          } />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
