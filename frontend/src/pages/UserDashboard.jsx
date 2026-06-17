@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { CheckCircle2, Clock, Edit2, Mail, Phone, LogOut, Star } from 'lucide-react';
 import API from '../utils/api';
-import { resolveMediaUrl } from '../utils/media';
+import OfferVisual from '../components/OfferVisual';
 
 const orderSteps = ['Pending', 'Confirmed', 'Preparing', 'Packed', 'Shipped', 'Delivered'];
 
@@ -164,18 +164,11 @@ const UserDashboard = () => {
         {offers.length > 0 && (
           <div className="mb-6 grid gap-4 md:grid-cols-3">
             {offers.slice(0, 3).map((offer) => {
-              const banner = resolveMediaUrl(offer.bannerImage);
               const discount = offer.discountType === 'percentage' ? `${offer.discountValue}% OFF` : `Rs. ${offer.discountValue} OFF`;
               return (
                 <article key={offer._id || offer.title} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60">
                   <div className="aspect-[16/9] bg-zinc-900">
-                    {banner ? (
-                      <img src={banner} alt={offer.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-red-950 to-zinc-950 text-xl font-black text-white">
-                        {discount}
-                      </div>
-                    )}
+                    <OfferVisual offer={offer} discountLabel={discount} />
                   </div>
                   <div className="p-4">
                     <p className="text-xs font-black uppercase tracking-widest text-bakery-gold">{discount}</p>

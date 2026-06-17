@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import Hero from '../components/Hero';
 import API from '../utils/api';
 import { resolveMediaUrl } from '../utils/media';
+import OfferVisual from '../components/OfferVisual';
 
 const categoryGradients = {
   '65 Varieties': 'from-red-950 to-amber-950',
@@ -134,17 +135,10 @@ const Home = () => {
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {offers.slice(0, 3).map((offer) => {
-              const banner = resolveMediaUrl(offer.bannerImage);
               return (
                 <article key={offer._id || offer.title} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60">
                   <div className="aspect-[16/9] bg-zinc-900">
-                    {banner ? (
-                      <img src={banner} alt={offer.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-red-950 to-zinc-950 text-2xl font-black text-white">
-                        {formatOfferDiscount(offer)}
-                      </div>
-                    )}
+                    <OfferVisual offer={offer} discountLabel={formatOfferDiscount(offer)} />
                   </div>
                   <div className="p-5">
                     <p className="text-xs font-black uppercase tracking-widest text-bakery-gold">{formatOfferDiscount(offer)}</p>

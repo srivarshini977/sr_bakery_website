@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import API from '../utils/api';
-import { resolveMediaUrl } from '../utils/media';
+import OfferVisual from '../components/OfferVisual';
 
 const formatDiscount = (offer) => {
   if (offer.discountType === 'percentage') return `${offer.discountValue}% OFF`;
@@ -43,17 +43,10 @@ const Offers = () => {
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
           {offers.map((offer) => {
-            const banner = resolveMediaUrl(offer.bannerImage);
             return (
               <article key={offer._id || offer.title} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60 shadow-xl shadow-black/30">
                 <div className="aspect-[16/9] bg-zinc-900">
-                  {banner ? (
-                    <img src={banner} alt={offer.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-red-950 to-zinc-950 text-3xl font-black text-white">
-                      {formatDiscount(offer)}
-                    </div>
-                  )}
+                  <OfferVisual offer={offer} discountLabel={formatDiscount(offer)} />
                 </div>
                 <div className="p-6">
                   <div className="mb-3 flex flex-wrap items-center gap-2">

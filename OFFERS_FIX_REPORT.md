@@ -38,7 +38,11 @@
 - Offers page now displays offer image, name, discount, expiry date and status.
 - Expired or inactive offers are filtered out by `getActiveCoupons`.
 - Homepage and customer dashboard now fetch live offers from MongoDB.
-- Admin dashboard now has an offer banner image field.
+- Admin dashboard offer form was simplified to occasion, combo item selection, discount mode and discount value.
+- Combo price and final offer price are calculated instantly from selected product prices.
+- Manual banner URL entry was removed from the admin form.
+- Offer banners now automatically combine selected product images on admin preview, Offers page, Homepage and Customer Dashboard.
+- Extra Master Management refresh button was removed to avoid duplicate refresh controls.
 
 ## Verification Results
 
@@ -49,4 +53,3 @@
   - Confirmed the QA offer appeared in `/api/products/dynamic/offers`.
   - Confirmed public title, discount and `Active` status were returned.
   - Deleted the QA offer after verification.
-

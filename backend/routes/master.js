@@ -253,7 +253,7 @@ router.delete('/vendors/:id', asyncHandler(async (req, res) => {
 }));
 
 router.get('/coupons', asyncHandler(async (req, res) => {
-  const coupons = await Coupon.find().populate('productIds', 'name price category').sort({ expiryDate: 1, code: 1 });
+  const coupons = await Coupon.find().populate('productIds', 'name price category image').sort({ expiryDate: 1, code: 1 });
   send(res, 'coupons', coupons);
 }));
 

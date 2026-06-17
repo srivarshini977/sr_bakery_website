@@ -108,6 +108,8 @@ router.get('/dynamic/offers', async (req, res) => {
         products: matchedProducts.map((product) => ({
           _id: product._id,
           name: product.name,
+          category: product.category,
+          image: product.image,
           price: product.price,
           originalPrice: product.originalPrice || product.price
         }))

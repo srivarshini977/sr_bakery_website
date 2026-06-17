@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ImagePlus, Plus, RefreshCw, Save, Trash2 } from 'lucide-react';
+import { ImagePlus, Plus, Save, Trash2 } from 'lucide-react';
 import API from '../utils/api';
 import { resolveMediaUrl } from '../utils/media';
+import OfferVisual from './OfferVisual';
 
 const emptyForms = {
   ingredient: { name: '', category: 'General', quantity: 0, unit: 'kg', minThreshold: 10, costPerUnit: 0, supplier: '' },
@@ -9,7 +10,7 @@ const emptyForms = {
   category: { name: '', description: '', sortOrder: 0, active: true },
   staff: { name: '', email: '', phone: '', password: 'Staff@123', staffRole: 'chef', staffPerson: '' },
   vendor: { name: '', contactPerson: '', phone: '', email: '', address: '', deliverySchedule: 'Weekly', supplierProducts: [] },
-  coupon: { code: '', title: '', occasion: '', description: '', bannerImage: '', discountType: 'percentage', discountValue: 10, minOrderAmount: 0, startDate: '', expiryDate: '', active: true, productIds: [] },
+  coupon: { occasion: '', discountType: 'percentage', discountValue: 10, productIds: [] },
   role: { name: '', description: '', permissions: ['orders:view'], active: true },
   todaySpecial: { productId: '', image: '', title: '', description: '', active: true },
   bakery: { name: 'SR Bakery', phone: '', email: '', address: '', workingHours: '8:00 AM - 10:00 PM' },
@@ -52,6 +53,24 @@ const MasterManagement = () => {
   const ingredients = data.ingredients || [];
   const vendors = data.vendors || [];
   const categories = data.categories || [];
+  const selectedCouponProducts = useMemo(
+    () => products.filter((product) => forms.coupon.productIds.includes(product._id)),
+    [products, forms.coupon.productIds]
+  );
+  const comboOriginalTotal = useMemo(
+    () => selectedCouponProducts.reduce((sum, product) => sum + Number(product.price || 0), 0),
+    [selectedCouponProducts]
+  );
+  const comboOfferPrice = useMemo(() => {
+    const discount = Number(forms.coupon.discountValue || 0);
+    const discounted = forms.coupon.discountType === 'percentage'
+      ? comboOriginalTotal - (comboOriginalTotal * discount / 100)
+      : comboOriginalTotal - discount;
+    return Math.max(0, Math.round(discounted));
+  }, [comboOriginalTotal, forms.coupon.discountType, forms.coupon.discountValue]);
+  const couponDiscountLabel = forms.coupon.discountType === 'percentage'
+    ? `${Number(forms.coupon.discountValue || 0)}% OFF`
+    : `Rs. ${Number(forms.coupon.discountValue || 0)} OFF`;
 
   const lowStockIngredients = useMemo(() => ingredients.filter((item) => Number(item.quantity) <= Number(item.minThreshold)), [ingredients]);
 
@@ -136,6 +155,46 @@ const MasterManagement = () => {
       fetchAll();
     } catch (error) {
       alert(error.response?.data?.message || 'Unable to save');
+    }
+  };
+
+  const saveOffer = async () => {
+    if (!forms.coupon.occasion.trim()) {
+      alert('Enter the occasion');
+      return;
+    }
+    if (forms.coupon.productIds.length === 0) {
+      alert('Select combo items');
+      return;
+    }
+
+    const now = new Date();
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + 30);
+    const normalizedOccasion = forms.coupon.occasion.trim();
+    const comboNames = selectedCouponProducts.map((product) => product.name).join(', ');
+    const codePrefix = normalizedOccasion.replace(/[^a-z0-9]/gi, '').slice(0, 8).toUpperCase() || 'OFFER';
+    const payload = {
+      code: `${codePrefix}${now.getTime().toString().slice(-5)}`,
+      title: `${normalizedOccasion} Combo`,
+      occasion: normalizedOccasion,
+      description: `${comboNames} combo for Rs. ${comboOfferPrice}.`,
+      bannerImage: '',
+      discountType: forms.coupon.discountType,
+      discountValue: Number(forms.coupon.discountValue || 0),
+      minOrderAmount: 0,
+      startDate: now.toISOString().slice(0, 10),
+      expiryDate: expiry.toISOString().slice(0, 10),
+      active: true,
+      productIds: forms.coupon.productIds
+    };
+
+    try {
+      await API.post('/master/coupons', payload);
+      setForms((current) => ({ ...current, coupon: emptyForms.coupon }));
+      fetchAll();
+    } catch (error) {
+      alert(error.response?.data?.message || 'Unable to save offer');
     }
   };
 
@@ -230,9 +289,6 @@ const MasterManagement = () => {
           <h2 className="text-3xl font-black text-white">Master Management</h2>
           <p className="text-sm text-gray-400">Central controls for inventory, menu, staff, vendors, offers, settings, and permissions.</p>
         </div>
-        <button onClick={fetchAll} className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-4 py-2 font-bold text-white hover:bg-zinc-700">
-          <RefreshCw size={16} /> {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
       </div>
 
       {summary && (
@@ -459,36 +515,110 @@ const MasterManagement = () => {
       {activeTab === 'offers' && (
         <section className="grid gap-4 xl:grid-cols-[0.7fr_1.3fr]">
           <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-            <h3 className="text-xl font-bold text-white">Create Offer / Coupon</h3>
+            <h3 className="text-xl font-bold text-white">Create Combo Offer</h3>
             <div className="mt-4 grid gap-3">
-              <input className={inputClass} placeholder="Coupon code" value={forms.coupon.code} onChange={(e) => setForm('coupon', { code: e.target.value.toUpperCase() })} />
-              <input className={inputClass} placeholder="Offer title, e.g. Diwali Special" value={forms.coupon.title} onChange={(e) => setForm('coupon', { title: e.target.value })} />
-              <input className={inputClass} placeholder="Occasion" value={forms.coupon.occasion} onChange={(e) => setForm('coupon', { occasion: e.target.value })} />
-              <textarea className={inputClass} placeholder="Description" value={forms.coupon.description} onChange={(e) => setForm('coupon', { description: e.target.value })} />
-              <input className={inputClass} placeholder="Offer banner image URL or /uploads path" value={forms.coupon.bannerImage} onChange={(e) => setForm('coupon', { bannerImage: e.target.value })} />
-              <select className={inputClass} value={forms.coupon.discountType} onChange={(e) => setForm('coupon', { discountType: e.target.value })}>
-                <option value="percentage">Percentage discount</option>
-                <option value="fixed">Fixed rupees discount</option>
-              </select>
-              <div className="grid grid-cols-2 gap-3">
-                <input className={inputClass} type="number" placeholder="Discount value" value={forms.coupon.discountValue} onChange={(e) => setForm('coupon', { discountValue: Number(e.target.value) })} />
-                <input className={inputClass} type="number" placeholder="Min order" value={forms.coupon.minOrderAmount} onChange={(e) => setForm('coupon', { minOrderAmount: Number(e.target.value) })} />
-                <input className={inputClass} type="date" value={forms.coupon.startDate || ''} onChange={(e) => setForm('coupon', { startDate: e.target.value })} />
-                <input className={inputClass} type="date" value={forms.coupon.expiryDate || ''} onChange={(e) => setForm('coupon', { expiryDate: e.target.value })} />
+              <input className={inputClass} placeholder="Occasion, e.g. Weekend Combo" value={forms.coupon.occasion} onChange={(e) => setForm('coupon', { occasion: e.target.value })} />
+
+              <div>
+                <p className="mb-2 text-xs font-black uppercase tracking-widest text-gray-500">Combo Items</p>
+                <div className="grid max-h-80 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+                  {products.map((product) => {
+                    const selected = forms.coupon.productIds.includes(product._id);
+                    const image = resolveMediaUrl(product.image);
+                    return (
+                      <button
+                        key={product._id}
+                        type="button"
+                        onClick={() => {
+                          const nextIds = selected
+                            ? forms.coupon.productIds.filter((id) => id !== product._id)
+                            : [...forms.coupon.productIds, product._id];
+                          setForm('coupon', { productIds: nextIds });
+                        }}
+                        className={`grid grid-cols-[64px_1fr] items-center gap-3 rounded-lg border p-2 text-left transition ${
+                          selected ? 'border-red-600 bg-red-950/50' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-600'
+                        }`}
+                      >
+                        <div className="h-16 w-16 overflow-hidden rounded bg-zinc-950">
+                          {image ? (
+                            <img src={image} alt={product.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs font-black uppercase text-gray-500">
+                              {product.name?.slice(0, 2)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="line-clamp-1 font-bold text-white">{product.name}</p>
+                          <p className="text-sm font-black text-red-300">Rs. {product.price}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <select
-                multiple
-                className={`${inputClass} min-h-36`}
-                value={forms.coupon.productIds}
-                onChange={(e) => setForm('coupon', { productIds: Array.from(e.target.selectedOptions).map((option) => option.value) })}
-              >
-                {products.map((product) => <option key={product._id} value={product._id}>{product.name} - Rs. {product.price}</option>)}
-              </select>
-              <p className="text-xs text-gray-500">Hold Ctrl and click to select combo items. The reduced price appears in Menu and Offers only while the offer date is valid.</p>
-              <button className={buttonClass} onClick={() => createItem('coupons', 'coupon')}><Plus size={16} /> Save Offer</button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <select className={inputClass} value={forms.coupon.discountType} onChange={(e) => setForm('coupon', { discountType: e.target.value })}>
+                  <option value="percentage">Percentage</option>
+                  <option value="fixed">Money</option>
+                </select>
+                <input className={inputClass} type="number" placeholder="Discount" value={forms.coupon.discountValue} onChange={(e) => setForm('coupon', { discountValue: Number(e.target.value) })} />
+              </div>
+
+              <div className="overflow-hidden rounded-lg border border-red-900/50 bg-black/50">
+                <div className="aspect-[16/9] bg-zinc-900">
+                  <OfferVisual
+                    offer={{ products: selectedCouponProducts }}
+                    discountLabel={couponDiscountLabel}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 p-4 text-sm">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-500">Combo Price</p>
+                    <p className="mt-1 text-lg font-black text-gray-400 line-through">Rs. {comboOriginalTotal}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-500">Offer Price</p>
+                    <p className="mt-1 text-2xl font-black text-red-300">Rs. {comboOfferPrice}</p>
+                  </div>
+                </div>
+              </div>
+
+              <button className={buttonClass} onClick={saveOffer}><Plus size={16} /> Save Offer</button>
             </div>
           </div>
-          <EditableTable title="Coupons" rows={data.coupons} columns={['code', 'title', 'description', 'bannerImage', 'discountType', 'discountValue', 'startDate', 'expiryDate', 'active']} endpoint="coupons" updateItem={updateItem} deleteItem={deleteItem} />
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+            <h3 className="text-xl font-bold text-white">Saved Offers</h3>
+            <div className="mt-4 grid gap-4">
+              {data.coupons.map((coupon) => {
+                const comboProducts = (coupon.productIds || []).filter((product) => product && typeof product === 'object');
+                const originalTotal = comboProducts.reduce((sum, product) => sum + Number(product.price || 0), 0);
+                const discount = Number(coupon.discountValue || 0);
+                const offerTotal = coupon.discountType === 'percentage'
+                  ? Math.max(0, Math.round(originalTotal - (originalTotal * discount / 100)))
+                  : Math.max(0, Math.round(originalTotal - discount));
+                const discountText = coupon.discountType === 'percentage' ? `${discount}% OFF` : `Rs. ${discount} OFF`;
+                return (
+                  <article key={coupon._id} className="grid gap-4 rounded-lg border border-zinc-800 bg-zinc-900 p-3 md:grid-cols-[180px_1fr_auto]">
+                    <div className="aspect-[16/9] overflow-hidden rounded bg-zinc-950">
+                      <OfferVisual offer={{ ...coupon, products: comboProducts }} discountLabel={discountText} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-widest text-bakery-gold">{coupon.occasion || coupon.title}</p>
+                      <h4 className="mt-1 font-black text-white">{coupon.title}</h4>
+                      <p className="mt-2 text-sm text-gray-400">{comboProducts.map((product) => product.name).join(', ') || coupon.description}</p>
+                      <p className="mt-2 text-sm font-bold text-gray-500">
+                        Rs. {originalTotal} to <span className="text-red-300">Rs. {offerTotal}</span> ({discountText})
+                      </p>
+                    </div>
+                    <button onClick={() => deleteItem('coupons', coupon._id)} className="h-fit rounded bg-red-950 p-2 text-red-200 hover:bg-red-900" title="Delete"><Trash2 size={15} /></button>
+                  </article>
+                );
+              })}
+              {data.coupons.length === 0 && <p className="rounded-lg border border-zinc-800 p-6 text-center text-gray-500">No offers yet.</p>}
+            </div>
+          </div>
         </section>
       )}
 
