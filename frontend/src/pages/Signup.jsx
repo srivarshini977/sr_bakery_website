@@ -1,0 +1,187 @@
+import React, { useState, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
+import { User, Mail, Phone, Lock, AlertCircle, CheckCircle } from 'lucide-react';
+
+const Signup = () => {
+  const { signup } = useContext(AuthContext);
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    // Validation
+    if (!name || !email || !phone || !password || !confirmPassword) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!/^\d{10}$/.test(phone)) {
+      setError('Phone must be 10 digits');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await signup(name, email, phone, password);
+      setSuccess('Account created successfully! Redirecting...');
+      setTimeout(() => navigate('/dashboard'), 1500);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Signup failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-red-950 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Card */}
+        <div className="glass-card p-8 rounded-lg border border-red-900 space-y-6">
+          {/* Header */}
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-white">SR Bakery</h1>
+            <p className="text-red-400 text-sm mt-2">Create Your Account</p>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="flex gap-3 p-4 bg-red-950 border border-red-900 rounded-lg">
+              <AlertCircle className="text-red-400 flex-shrink-0" />
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {success && (
+            <div className="flex gap-3 p-4 bg-green-950 border border-green-900 rounded-lg">
+              <CheckCircle className="text-green-400 flex-shrink-0" />
+              <p className="text-green-400 text-sm">{success}</p>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 text-gray-500" size={18} />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="John Doe"
+                  className="w-full bg-zinc-800 text-white px-4 py-2 pl-10 rounded-lg border border-zinc-700 focus:border-red-600 focus:outline-none transition"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Email Address</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 text-gray-500" size={18} />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full bg-zinc-800 text-white px-4 py-2 pl-10 rounded-lg border border-zinc-700 focus:border-red-600 focus:outline-none transition"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Phone Number</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 text-gray-500" size={18} />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="9876543210"
+                  className="w-full bg-zinc-800 text-white px-4 py-2 pl-10 rounded-lg border border-zinc-700 focus:border-red-600 focus:outline-none transition"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full bg-zinc-800 text-white px-4 py-2 pl-10 rounded-lg border border-zinc-700 focus:border-red-600 focus:outline-none transition"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Confirm Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 text-gray-500" size={18} />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm password"
+                  className="w-full bg-zinc-800 text-white px-4 py-2 pl-10 rounded-lg border border-zinc-700 focus:border-red-600 focus:outline-none transition"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-red-700 hover:bg-red-800 disabled:bg-red-900 text-white py-3 rounded-lg font-bold transition"
+            >
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </button>
+          </form>
+
+          {/* Divider */}
+          <div className="border-t border-zinc-700"></div>
+
+          {/* Footer */}
+          <div className="text-center">
+            <p className="text-gray-400 text-sm">
+              Already have an account?{' '}
+              <Link to="/login" className="text-red-400 hover:text-red-300 font-bold">
+                Login
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Signup;
