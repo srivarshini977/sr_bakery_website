@@ -5,9 +5,8 @@ import crypto from 'crypto';
 
 const router = express.Router();
 
-// MOCK RAZORPAY KEY (for demo only)
-const RAZORPAY_KEY_ID = 'rzp_live_mock123456789';
-const RAZORPAY_KEY_SECRET = 'wr7x8nxAb1234567890';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
 
 // CREATE RAZORPAY ORDER (Mock)
 router.post('/create-order', async (req, res) => {
@@ -25,6 +24,7 @@ router.post('/create-order', async (req, res) => {
       status: 'success',
       data: {
         razorpayOrderId: mockRazorpayOrderId,
+        keyId: RAZORPAY_KEY_ID,
         amount: amount * 100, // in paise
         currency: currency,
         customerId: `cust_${Date.now()}`,
