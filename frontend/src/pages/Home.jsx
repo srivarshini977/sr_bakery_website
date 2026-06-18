@@ -5,6 +5,8 @@ import Hero from '../components/Hero';
 import API from '../utils/api';
 import { resolveMediaUrl } from '../utils/media';
 import OfferVisual from '../components/OfferVisual';
+import storefrontImage from '../assets/about-storefront.jpg';
+import interiorImage from '../assets/about-interior.jpg';
 
 const categoryGradients = {
   '65 Varieties': 'from-red-950 to-amber-950',
@@ -60,6 +62,14 @@ const formatOfferDiscount = (offer) => (
   offer.discountType === 'percentage' ? `${offer.discountValue}% OFF` : `Rs. ${offer.discountValue} OFF`
 );
 
+const bakeryHighlights = [
+  'Fresh Cakes Every Day',
+  'Traditional Tamil Sweets',
+  'Fast Food & Chats Corner',
+  'Birthday Cake Customization',
+  'Fresh Juices & Cool Drinks'
+];
+
 const Home = () => {
   const { t } = useContext(AuthContext);
   const [featuredItems, setFeaturedItems] = useState([]);
@@ -98,6 +108,20 @@ const Home = () => {
   return (
     <div className="flex min-h-screen w-full flex-col items-stretch justify-start">
       <Hero title={t('heroHeading')} subtitle={t('heroSubheading')} ctaText={t('orderNow')} />
+
+      <section className="w-full px-5 py-10 sm:px-8 lg:px-12 2xl:px-16">
+        <div className="mb-6">
+          <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Categories</p>
+          <h2 className="mt-2 text-2xl font-bold text-white">Bakery Counter Favorites</h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {bakeryHighlights.map((item) => (
+            <div key={item} className="rounded-lg border border-red-900/50 bg-zinc-950 p-5">
+              <p className="text-lg font-black text-white">{item}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="w-full px-5 py-10 sm:px-8 lg:px-12 2xl:px-16">
         <div className="grid items-start gap-6 lg:grid-cols-[1.05fr_0.95fr]">
@@ -154,7 +178,7 @@ const Home = () => {
       )}
 
       <section className="w-full px-5 py-14 sm:px-8 md:py-16 lg:px-12 2xl:px-16">
-        <h2 className="text-2xl font-bold text-white mb-6">Best Selling Items</h2>
+        <h2 className="text-2xl font-bold text-white mb-6">Featured Products</h2>
         {loadingFeatured ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
@@ -186,24 +210,47 @@ const Home = () => {
       <section className="w-full px-5 pb-16 sm:px-8 lg:px-12 2xl:px-16">
         <div className="mb-6 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Customer Love</p>
-            <h2 className="mt-2 text-2xl font-bold text-white">Testimonials & Recent Reviews</h2>
+            <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Customer Feedback</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">Approved Customer Feedback</h2>
           </div>
         </div>
         {reviews.length === 0 ? (
-          <div className="rounded-lg border border-red-900/40 bg-zinc-950 p-6 text-gray-400">Reviews will appear here after delivered orders.</div>
+          <div className="rounded-lg border border-red-900/40 bg-zinc-950 p-6 text-gray-400">Real customer feedback will appear here after admin approval.</div>
         ) : (
           <div className="grid gap-4 md:grid-cols-3">
             {reviews.slice(0, 6).map((review) => (
               <motion.article key={review._id} whileHover={{ y: -4 }} className="rounded-lg border border-red-900/40 bg-black/55 p-5">
-                <p className="text-yellow-300">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</p>
-                <h3 className="mt-3 font-black text-white">{review.title || 'Fresh and tasty'}</h3>
+                <p className="text-sm font-bold text-yellow-300">{review.rating}/5 stars</p>
+                <h3 className="mt-3 font-black text-white">{review.user?.name || 'Customer'}</h3>
                 <p className="mt-2 line-clamp-4 text-sm leading-6 text-gray-300">{review.comment}</p>
-                <p className="mt-4 text-xs font-bold uppercase tracking-widest text-red-300">{review.user?.name || 'Customer'}</p>
+                <p className="mt-4 text-xs font-bold uppercase tracking-widest text-red-300">
+                  {new Date(review.createdAt).toLocaleDateString('en-IN')}
+                </p>
               </motion.article>
             ))}
           </div>
         )}
+      </section>
+
+      <section className="w-full px-5 pb-16 sm:px-8 lg:px-12 2xl:px-16">
+        <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Bakery Gallery</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">SR Bakery, Oddanchatram</h2>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {[storefrontImage, interiorImage].map((image, index) => (
+                <img key={image} src={image} alt={`SR Bakery gallery ${index + 1}`} className="h-64 w-full rounded-lg border border-red-900/50 object-cover" />
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-red-900/50 bg-zinc-950 p-6">
+            <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Contact & Location</p>
+            <h2 className="mt-2 text-2xl font-bold text-white">Visit the Fresh Counter</h2>
+            <p className="mt-4 text-gray-300">233/1A1, Ground Floor, Dindigul-Palani Road, Near Keerthi Supermarket, Oddanchatram.</p>
+            <p className="mt-3 text-gray-300">Call for birthday cake customization, party snacks, sweets and daily counter orders.</p>
+            <a href="/contact" className="mt-5 inline-flex rounded bg-red-700 px-5 py-3 font-bold text-white hover:bg-red-800">Contact SR Bakery</a>
+          </div>
+        </div>
       </section>
     </div>
   );

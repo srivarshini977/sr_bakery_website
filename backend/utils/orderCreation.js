@@ -16,6 +16,9 @@ export const createOrderFromPayload = async (payload, app = null, paymentOverrid
     discountAmount,
     couponCode,
     paymentMethod,
+    orderSource,
+    employeeId,
+    staffDiscountPercentage,
     orderType,
     tableNumber,
     deliveryAddress,
@@ -132,21 +135,31 @@ export const createOrderFromPayload = async (payload, app = null, paymentOverrid
 
   const itemsAmount = pricedItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
   const deliveryCharge = deliveryDetails?.deliveryCharge || 0;
-  const payableAmount = itemsAmount + deliveryCharge;
-  const pointsEarned = Math.floor(payableAmount / 100);
-  const resolvedPaymentMethod = paymentMethod || 'cash';
+  const resolvedOrderSource = orderSource || (guestName ? 'pos' : 'customer');
+  const resolvedPaymentMethod = paymentMethod || (orderType === 'delivery' ? 'cash_on_delivery' : 'cash_counter');
+  const staffDiscountPercent = resolvedOrderSource === 'staff'
+    ? Math.min(100, Math.max(0, Number(staffDiscountPercentage || 0)))
+    : 0;
+  const staffDiscountAmount = Number(((itemsAmount * staffDiscountPercent) / 100).toFixed(2));
+  const totalDiscount = Number(discountAmount || 0) + staffDiscountAmount;
+  const payableAmount = Math.max(0, itemsAmount - totalDiscount) + deliveryCharge;
+  const pointsEarned = resolvedOrderSource === 'customer' ? Math.floor(payableAmount / 100) : 0;
 
   const order = await Order.create({
     user: userId || null,
     guestName: guestName || '',
     items: pricedItems,
     totalAmount: payableAmount,
-    discountAmount: discountAmount || 0,
+    discountAmount: totalDiscount,
     couponCode: couponCode || '',
     paymentMethod: resolvedPaymentMethod,
-    paymentStatus: paymentOverrides.paymentStatus || (resolvedPaymentMethod === 'razorpay' ? 'Pending' : 'Paid'),
+    paymentStatus: paymentOverrides.paymentStatus || (resolvedPaymentMethod === 'reservation' ? 'Pending' : 'Paid'),
     razorpayOrderId: paymentOverrides.razorpayOrderId || '',
     razorpayPaymentId: paymentOverrides.razorpayPaymentId || '',
+    orderSource: resolvedOrderSource,
+    employeeId: employeeId || '',
+    staffDiscountPercentage: staffDiscountPercent,
+    staffDiscountAmount,
     orderType,
     tableNumber: tableNumber || '',
     deliveryAddress: normalizedDeliveryAddress,
@@ -175,7 +188,7 @@ export const createOrderFromPayload = async (payload, app = null, paymentOverrid
   order.totalAmount = invoice.totalAmount;
   await order.save();
 
-  if (userId) {
+  if (userId && resolvedOrderSource === 'customer') {
     await User.findByIdAndUpdate(userId, { $inc: { loyaltyPoints: pointsEarned } });
   }
 

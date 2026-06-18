@@ -10,6 +10,7 @@ const Wishlist = () => {
     wishlistItems,
     refreshWishlist,
     toggleWishlist,
+    removeFromWishlist,
     addToCart,
     showToast
   } = useContext(AuthContext);
@@ -27,9 +28,14 @@ const Wishlist = () => {
     await toggleWishlist(productId);
   };
 
-  const handleAddToCart = (product) => {
+  const handleAddToCart = async (product) => {
     if (addToCart(product)) {
-      showToast('Added to Cart');
+      try {
+        await removeFromWishlist(product._id, { silent: true });
+      } catch (error) {
+        console.error('Unable to remove moved cart item from wishlist:', error);
+      }
+      showToast('Moved to Cart');
     }
   };
 

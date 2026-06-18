@@ -4,43 +4,71 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { CheckCircle2, Clock, Edit2, Mail, Phone, LogOut, Star } from 'lucide-react';
 import API from '../utils/api';
-import OfferVisual from '../components/OfferVisual';
 
-const orderSteps = ['Pending', 'Confirmed', 'Preparing', 'Packed', 'Shipped', 'Delivered'];
+const dashboardStepsByType = {
+  delivery: [
+    { status: 'Pending', label: 'Placed' },
+    { status: 'Confirmed', label: 'Confirmed' },
+    { status: 'Preparing', label: 'Preparing' },
+    { status: 'Packed', label: 'Packed' },
+    { status: 'Shipped', label: 'On the way' },
+    { status: 'Delivered', label: 'Delivered' }
+  ],
+  takeaway: [
+    { status: 'Pending', label: 'Placed' },
+    { status: 'Confirmed', label: 'Confirmed' },
+    { status: 'Preparing', label: 'Preparing' },
+    { status: 'Packed', label: 'Ready' },
+    { status: 'Delivered', label: 'Collected' }
+  ],
+  'dine-in': [
+    { status: 'Pending', label: 'Placed' },
+    { status: 'Confirmed', label: 'Confirmed' },
+    { status: 'Preparing', label: 'Preparing' },
+    { status: 'Packed', label: 'Ready' },
+    { status: 'Delivered', label: 'Served' }
+  ]
+};
 
-const OrderTimeline = ({ status }) => {
-  const normalizedStatus = status === 'Ready' ? 'Packed' : status;
-  const activeIndex = Math.max(0, orderSteps.indexOf(normalizedStatus));
+const getDashboardSteps = (order) => dashboardStepsByType[order?.orderType] || dashboardStepsByType.takeaway;
+
+const OrderTimeline = ({ order }) => {
+  const orderSteps = getDashboardSteps(order);
+  const normalizedStatus = order?.status === 'Ready' || (order?.orderType !== 'delivery' && order?.status === 'Shipped')
+    ? 'Packed'
+    : order?.status;
+  const activeIndex = order?.status === 'Cancelled' ? -1 : Math.max(0, orderSteps.findIndex((step) => step.status === normalizedStatus));
   return (
-    <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <div className="relative grid grid-cols-2 gap-3 md:grid-cols-6">
+    <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-3">
+      {order?.status === 'Cancelled' && (
+        <p className="mb-3 rounded border border-red-900 bg-red-950 px-3 py-2 text-xs font-bold text-red-200">Cancelled</p>
+      )}
+      <div className="grid grid-cols-3 gap-2 md:grid-cols-6">
         {orderSteps.map((step, index) => {
           const done = index <= activeIndex;
           return (
-            <div key={step} className="relative">
-              <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-full ${done ? 'bg-green-700 text-white' : 'bg-zinc-800 text-gray-500'}`}>
-                {done ? <CheckCircle2 size={18} /> : <Clock size={18} />}
+            <div key={step.status} className="flex items-center gap-2">
+              <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? 'bg-green-700 text-white' : 'bg-zinc-800 text-gray-500'}`}>
+                {done ? <CheckCircle2 size={13} /> : <Clock size={13} />}
               </div>
-              <p className={`text-xs font-bold ${done ? 'text-white' : 'text-gray-500'}`}>{step}</p>
+              <p className={`text-[11px] font-bold ${done ? 'text-white' : 'text-gray-500'}`}>{step.label}</p>
             </div>
           );
         })}
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-800">
-        <div className="h-full rounded-full bg-gradient-to-r from-red-700 via-yellow-500 to-green-600 transition-all duration-500" style={{ width: `${((activeIndex + 1) / orderSteps.length) * 100}%` }} />
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-800">
+        <div className="h-full rounded-full bg-gradient-to-r from-red-700 via-yellow-500 to-green-600 transition-all duration-500" style={{ width: `${Math.max(0, ((activeIndex + 1) / orderSteps.length) * 100)}%` }} />
       </div>
-      <p className="mt-2 text-xs text-gray-400">Estimated completion: {normalizedStatus === 'Delivered' ? 'Completed' : '25-40 minutes from confirmation'}</p>
     </div>
   );
 };
 
 const UserDashboard = () => {
-  const { user, token, logout } = useContext(AuthContext);
+  const { user, token, logout, wishlistItems, refreshWishlist } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('profile'); // profile, orders, addresses
+  const [activeTab, setActiveTab] = useState('current');
   const [orders, setOrders] = useState([]);
   const [addresses, setAddresses] = useState([]);
-  const [offers, setOffers] = useState([]);
   const [editMode, setEditMode] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.name || '',
@@ -54,6 +82,8 @@ const UserDashboard = () => {
     pincode: ''
   });
   const [reviewForms, setReviewForms] = useState({});
+  const [generalFeedback, setGeneralFeedback] = useState({ message: '', sent: false });
+  const [reviewOpenOrderId, setReviewOpenOrderId] = useState('');
 
   // Fetch user orders
   const fetchOrders = async () => {
@@ -70,17 +100,12 @@ const UserDashboard = () => {
   useEffect(() => {
     if (token && user?._id) {
       fetchOrders();
+      refreshWishlist?.().catch((error) => console.error('Error refreshing favorites:', error));
       const interval = setInterval(fetchOrders, 5000);
       return () => clearInterval(interval);
     }
     return undefined;
   }, [token, user?._id]);
-
-  useEffect(() => {
-    API.get('/products/dynamic/offers')
-      .then((response) => setOffers(response.data.data?.offers || []))
-      .catch((error) => console.error('Error fetching dashboard offers:', error));
-  }, []);
 
   // Handle profile update
   const handleUpdateProfile = async () => {
@@ -122,6 +147,30 @@ const UserDashboard = () => {
     }
   };
 
+  const submitGeneralFeedback = async () => {
+    const orderId = generalFeedback.orderId || deliveredOrders[0]?._id;
+    if (!orderId || !generalFeedback.message) {
+      alert('Please select an order and enter your feedback');
+      return;
+    }
+    try {
+      await API.post('/reviews', {
+        orderId,
+        rating: 5,
+        title: '',
+        comment: generalFeedback.message
+      });
+      setGeneralFeedback({ message: '', sent: true, orderId });
+      alert('Feedback submitted for admin approval.');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Unable to save feedback');
+    }
+  };
+
+  const currentOrders = orders.filter((order) => !['Delivered', 'Cancelled'].includes(order.status));
+  const pastOrders = orders.filter((order) => ['Delivered', 'Cancelled'].includes(order.status));
+  const deliveredOrders = orders.filter((order) => order.status === 'Delivered');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-zinc-950 to-red-950 p-4 md:p-6">
       <div className="w-full px-5 sm:px-8 lg:px-12 2xl:px-16">
@@ -129,8 +178,9 @@ const UserDashboard = () => {
         <div className="glass-card p-6 rounded-lg border border-red-900 mb-8">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-3xl font-bold text-white">{user?.name}</h1>
-              <p className="text-gray-400 mt-1">{user?.email}</p>
+              <h1 className="text-3xl font-bold text-white">Customer Dashboard</h1>
+              <p className="text-gray-400 mt-1">Welcome, <span className="font-bold text-red-300">{user?.name}</span></p>
+              <p className="text-gray-500 mt-1">{user?.email}</p>
               <p className="text-sm text-gray-500 mt-2">Member ID: {user?._id?.substring(0, 8)}</p>
             </div>
             <button
@@ -144,7 +194,7 @@ const UserDashboard = () => {
 
         {/* Tab Navigation */}
         <div className="flex gap-2 mb-6 flex-wrap">
-          {['profile', 'orders', 'addresses'].map(tab => (
+          {['current', 'orders', 'profile'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -155,31 +205,11 @@ const UserDashboard = () => {
               }`}
             >
               {tab === 'profile' && 'Profile'}
-              {tab === 'orders' && `Orders (${orders.length})`}
-              {tab === 'addresses' && 'Addresses'}
+              {tab === 'current' && `Current Orders (${currentOrders.length})`}
+              {tab === 'orders' && `Past Orders (${pastOrders.length})`}
             </button>
           ))}
         </div>
-
-        {offers.length > 0 && (
-          <div className="mb-6 grid gap-4 md:grid-cols-3">
-            {offers.slice(0, 3).map((offer) => {
-              const discount = offer.discountType === 'percentage' ? `${offer.discountValue}% OFF` : `Rs. ${offer.discountValue} OFF`;
-              return (
-                <article key={offer._id || offer.title} className="overflow-hidden rounded-lg border border-red-900/50 bg-black/60">
-                  <div className="aspect-[16/9] bg-zinc-900">
-                    <OfferVisual offer={offer} discountLabel={discount} />
-                  </div>
-                  <div className="p-4">
-                    <p className="text-xs font-black uppercase tracking-widest text-bakery-gold">{discount}</p>
-                    <h2 className="mt-2 line-clamp-2 text-lg font-black text-white">{offer.title}</h2>
-                    {offer.expiryDate && <p className="mt-2 text-xs font-bold text-gray-500">Valid till {new Date(offer.expiryDate).toLocaleDateString()}</p>}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
 
         {/* Profile Tab */}
         {activeTab === 'profile' && (
@@ -256,9 +286,9 @@ const UserDashboard = () => {
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="space-y-4">
-            {orders.length === 0 ? (
+            {pastOrders.length === 0 ? (
               <div className="glass-card p-8 rounded-lg text-center border border-red-900">
-                <p className="text-gray-400 text-lg">No orders yet</p>
+                <p className="text-gray-400 text-lg">No past orders yet</p>
                 <button
                   onClick={() => navigate('/menu')}
                   className="mt-4 bg-red-700 hover:bg-red-800 px-6 py-2 rounded-lg text-white font-bold transition"
@@ -267,9 +297,9 @@ const UserDashboard = () => {
                 </button>
               </div>
             ) : (
-              orders.map(order => (
-                <div key={order._id} className="glass-card p-6 rounded-lg border border-red-900 hover:border-red-700 transition">
-                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+              pastOrders.map(order => (
+                <div key={order._id} className="rounded-lg border border-red-900/70 bg-zinc-950 p-4 transition hover:border-red-700">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] md:items-center">
                     <div>
                       <p className="text-xs text-gray-500">Order ID</p>
                       <p className="text-lg font-bold text-white">{order._id?.substring(0, 8)}</p>
@@ -299,68 +329,132 @@ const UserDashboard = () => {
                     </div>
                   </div>
 
-                  {order.items && (
-                    <div className="mt-4 border-t border-zinc-700 pt-4">
-                      <p className="text-xs text-gray-400 mb-2">Items:</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                        {order.items.map((item, idx) => (
-                          <p key={idx} className="text-sm text-gray-300">
-                            {item.name} x{item.quantity}
-                          </p>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <OrderTimeline status={order.status} />
+                  <p className="mt-3 border-t border-zinc-800 pt-3 text-sm text-gray-300">
+                    {order.items?.map((item) => `${item.name} x${item.quantity}`).join('  |  ')}
+                  </p>
 
                   {order.status === 'Delivered' && (
-                    <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-                      <div className="mb-3 flex items-center gap-2 text-yellow-300">
-                        <Star size={18} />
-                        <h3 className="font-bold text-white">Rate this order</h3>
-                      </div>
+                    <div className="mt-3 rounded-lg border border-zinc-800 bg-black/30 p-3">
                       {reviewForms[order._id]?.sent ? (
-                        <p className="rounded border border-green-700 bg-green-950/50 p-3 text-sm text-green-200">Review submitted. Thank you!</p>
-                      ) : (
-                        <div className="grid gap-3">
+                        <p className="text-sm text-green-200">Review submitted. Thank you!</p>
+                      ) : reviewOpenOrderId === order._id ? (
+                        <div className="grid gap-2 md:grid-cols-[140px_1fr_auto]">
                           <select
                             value={reviewForms[order._id]?.rating || 5}
                             onChange={(event) => setReviewForms((forms) => ({ ...forms, [order._id]: { ...forms[order._id], rating: event.target.value } }))}
-                            className="rounded border border-zinc-700 bg-zinc-900 p-2 text-white"
+                            className="rounded border border-zinc-700 bg-zinc-900 p-2 text-sm text-white"
                           >
                             {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} stars</option>)}
                           </select>
                           <input
-                            value={reviewForms[order._id]?.title || ''}
-                            onChange={(event) => setReviewForms((forms) => ({ ...forms, [order._id]: { ...forms[order._id], title: event.target.value } }))}
-                            className="rounded border border-zinc-700 bg-zinc-900 p-2 text-white"
-                            placeholder="Review title"
-                          />
-                          <textarea
                             value={reviewForms[order._id]?.comment || ''}
                             onChange={(event) => setReviewForms((forms) => ({ ...forms, [order._id]: { ...forms[order._id], comment: event.target.value } }))}
-                            className="rounded border border-zinc-700 bg-zinc-900 p-2 text-white"
+                            className="rounded border border-zinc-700 bg-zinc-900 p-2 text-sm text-white"
                             placeholder="Share your experience"
-                            rows="3"
                           />
-                          <button onClick={() => submitReview(order._id)} className="rounded bg-red-700 px-4 py-2 font-bold text-white hover:bg-red-800">
-                            Submit Review
+                          <button onClick={() => submitReview(order._id)} className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800">
+                            Submit
                           </button>
                         </div>
+                      ) : (
+                        <button onClick={() => setReviewOpenOrderId(order._id)} className="inline-flex items-center gap-2 text-sm font-bold text-yellow-300 hover:text-yellow-200">
+                          <Star size={16} /> Rate Order
+                        </button>
                       )}
                     </div>
                   )}
 
                   <button
                     onClick={() => navigate(`/orders/${order._id}`)}
-                    className="mt-4 w-full bg-red-700 hover:bg-red-800 text-white py-2 rounded-lg font-bold transition"
+                    className="mt-3 rounded bg-red-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-800"
                   >
                     Track Order
                   </button>
                 </div>
               ))
             )}
+          </div>
+        )}
+
+        {activeTab === 'current' && (
+          <div className="space-y-4">
+            {currentOrders.length === 0 ? (
+              <div className="glass-card rounded-lg border border-red-900 p-8 text-center text-gray-400">No current orders.</div>
+            ) : currentOrders.map((order) => (
+              <div key={order._id} className="rounded-lg border border-red-900/70 bg-zinc-950 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-bakery-gold">Token #{order._id?.slice(-6)?.toUpperCase()}</p>
+                    <h3 className="mt-1 text-xl font-black text-white">{order.status}</h3>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {order.items?.map((item) => `${item.name} x${item.quantity}`).join('  |  ')}
+                    </p>
+                  </div>
+                  <button onClick={() => navigate(`/orders/${order._id}`)} className="rounded bg-red-700 px-4 py-2 text-sm font-bold text-white hover:bg-red-800">
+                    Track Order
+                  </button>
+                </div>
+                <OrderTimeline order={order} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'favorites' && (
+          <div className="grid gap-4 md:grid-cols-3">
+            {(wishlistItems || []).length === 0 ? (
+              <div className="glass-card rounded-lg border border-red-900 p-8 text-center text-gray-400 md:col-span-3">No favorite items yet.</div>
+            ) : wishlistItems.map((item) => (
+              <div key={item._id} className="glass-card rounded-lg border border-red-900 p-5">
+                <p className="text-xs font-bold uppercase tracking-widest text-bakery-gold">{item.category}</p>
+                <h3 className="mt-2 text-lg font-black text-white">{item.name}</h3>
+                <p className="mt-3 text-red-300 font-black">Rs. {item.price}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'feedback' && (
+          <div className="glass-card rounded-lg border border-red-900 p-6">
+            <h2 className="text-2xl font-bold text-white">Feedback Submission</h2>
+            <p className="mt-2 text-sm text-gray-400">Delivered-order feedback appears on the homepage only after admin approval.</p>
+            {deliveredOrders.length === 0 ? (
+              <p className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-gray-400">Feedback is available after your first delivered order.</p>
+            ) : (
+              <div className="mt-5 grid gap-3">
+                <select
+                  className="rounded border border-zinc-700 bg-zinc-900 p-3 text-white"
+                  onChange={(event) => setGeneralFeedback({ ...generalFeedback, orderId: event.target.value })}
+                  value={generalFeedback.orderId || deliveredOrders[0]?._id || ''}
+                >
+                  {deliveredOrders.map((order) => (
+                    <option key={order._id} value={order._id}>Order #{order._id.slice(-6).toUpperCase()}</option>
+                  ))}
+                </select>
+                <textarea
+                  value={generalFeedback.message}
+                  onChange={(event) => setGeneralFeedback({ ...generalFeedback, message: event.target.value })}
+                  className="rounded border border-zinc-700 bg-zinc-900 p-3 text-white"
+                  placeholder="Share your feedback"
+                  rows="4"
+                />
+                {generalFeedback.sent && <p className="rounded border border-green-800 bg-green-950/50 p-3 text-sm text-green-200">Feedback submitted for admin approval.</p>}
+                <button
+                  onClick={submitGeneralFeedback}
+                  className="rounded bg-red-700 px-4 py-3 font-bold text-white hover:bg-red-800"
+                >
+                  Submit Feedback
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'loyalty' && (
+          <div className="glass-card rounded-lg border border-red-900 p-6">
+            <p className="text-sm font-bold uppercase tracking-widest text-bakery-gold">Reward Points</p>
+            <h2 className="mt-3 text-5xl font-black text-white">{user?.loyaltyPoints || 0}</h2>
+            <p className="mt-3 text-gray-400">Earn points on completed customer orders. Staff internal orders do not add loyalty points.</p>
           </div>
         )}
 

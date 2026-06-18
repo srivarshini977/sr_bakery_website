@@ -217,7 +217,7 @@ const seedData = async () => {
         { product: seededProducts[30]._id, name: seededProducts[30].name, quantity: 2, price: seededProducts[30].price }
       ],
       totalAmount: seededProducts[15].price + (seededProducts[30].price * 2),
-      paymentMethod: 'razorpay',
+      paymentMethod: 'cash_on_delivery',
       paymentStatus: 'Paid',
       orderType: 'delivery',
       status: 'Delivered',

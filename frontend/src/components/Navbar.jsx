@@ -113,7 +113,7 @@ const Navbar = () => {
                     <span>{t('staffPanel')}</span>
                   </Link>
                 )}
-                <Link to="/dashboard" className="flex items-center gap-1 text-sm font-bold text-white transition-colors hover:text-bakery-red">
+                <Link to="/dashboard" className="flex items-center gap-1 text-sm font-bold text-white transition-colors hover:text-bakery-red" title="Dashboard">
                   <User size={18} />
                   <span className="max-w-24 truncate">{user.name.split(' ')[0]}</span>
                 </Link>
@@ -179,10 +179,6 @@ const Navbar = () => {
                 <div className="text-sm font-semibold text-gray-400">
                   Logged in as: <span className="text-white">{user.name}</span>
                 </div>
-                <Link to="/dashboard" className="flex items-center gap-2 py-1 text-sm text-gray-300 hover:text-bakery-red">
-                  <User size={16} />
-                  <span>My Account</span>
-                </Link>
                 {user.role === 'customer' && (
                   <Link to="/wishlist" className="flex items-center gap-2 py-1 text-sm text-gray-300 hover:text-bakery-red">
                     <Heart size={16} />

@@ -94,8 +94,8 @@ const invoiceSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'razorpay', 'card'],
-    default: 'cash'
+    enum: ['cash', 'cash_counter', 'cash_on_delivery', 'reservation', 'razorpay', 'staff_internal'],
+    default: 'cash_counter'
   }
 }, { timestamps: true });
 

@@ -18,11 +18,14 @@ const StaffDashboard = () => {
   const [discount, setDiscount] = useState(0);
   const [taxPercent, setTaxPercent] = useState(5);
   const [guestName, setGuestName] = useState('Walk-in Customer');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState('cash_counter');
   const [billingOrder, setBillingOrder] = useState(null);
   const [billingInvoice, setBillingInvoice] = useState(null);
   const [dismissedTaskIds, setDismissedTaskIds] = useState([]);
   const [workstations, setWorkstations] = useState([]);
+  const [staffOrders, setStaffOrders] = useState([]);
+  const [employeeId, setEmployeeId] = useState('');
+  const [staffDiscountPercent, setStaffDiscountPercent] = useState(10);
 
   const staffRole = user?.staffRole || 'staff';
   const isChef = staffRole === 'chef';
@@ -110,6 +113,15 @@ const StaffDashboard = () => {
     }
   };
 
+  const fetchStaffOrders = async () => {
+    try {
+      const response = await API.get('/staff/orders/internal');
+      setStaffOrders(response.data.data?.orders || []);
+    } catch (error) {
+      console.error('Error fetching staff internal orders:', error);
+    }
+  };
+
   useEffect(() => {
     if (token && user?._id) {
       if (isChef) {
@@ -125,6 +137,7 @@ const StaffDashboard = () => {
       fetchAssignedOrders();
       fetchKdsQueue();
       fetchWorkstations();
+      fetchStaffOrders();
     }
   }, [token, user?._id, staffRole]);
 
@@ -201,7 +214,7 @@ const StaffDashboard = () => {
     setPosCart([]);
     setDiscount(0);
     setGuestName('Walk-in Customer');
-    setPaymentMethod('cash');
+    setPaymentMethod('cash_counter');
   };
 
   const printInvoicePdf = async (invoiceId) => {
@@ -363,10 +376,40 @@ const StaffDashboard = () => {
     }
   };
 
+  const handleCreateStaffOrder = async () => {
+    if (posCart.length === 0) {
+      alert('Add items before placing staff order');
+      return;
+    }
+
+    try {
+      const response = await API.post('/staff/orders/internal', {
+        employeeId,
+        staffDiscountPercentage: Number(staffDiscountPercent || 0),
+        items: posCart.map((item) => ({
+          product: item._id,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        }))
+      });
+      const createdOrder = response.data.data?.order;
+      setBillingOrder(createdOrder || null);
+      setPosCart([]);
+      fetchStaffOrders();
+      fetchKdsQueue();
+      alert(`Staff order placed\nInternal Bill: #${createdOrder?._id?.slice(-6)?.toUpperCase()}`);
+    } catch (error) {
+      console.error('Error creating staff order:', error);
+      alert(error.response?.data?.message || 'Failed to create staff order');
+    }
+  };
+
   const staffTabs = isChef
     ? [{ id: 'kot', label: `KOT (${kots.length})` }]
     : [
       ...(isCashier ? [{ id: 'invoices', label: `Invoices (${invoices.length})` }, { id: 'pos', label: 'POS System' }] : []),
+      { id: 'internal', label: `Staff Orders (${staffOrders.length})` },
       { id: 'assigned', label: `Assigned Orders (${assignedOrders.length})` },
       { id: 'kds', label: `KDS (${kdsList.length})` }
     ];
@@ -436,6 +479,7 @@ const StaffDashboard = () => {
                 fetchAssignedOrders();
                 fetchKdsQueue();
                 fetchInvoices();
+                fetchStaffOrders();
               }
             }}
             className="ml-auto px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition flex items-center gap-2"
@@ -681,9 +725,7 @@ const StaffDashboard = () => {
                 <input type="number" min="0" value={taxPercent} onChange={(event) => setTaxPercent(event.target.value)} className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white" placeholder="Tax %" />
               </div>
               <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white mb-4">
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="razorpay">Razorpay</option>
+                <option value="cash_counter">Cash at Counter</option>
               </select>
               <div className="space-y-2 border-t border-zinc-800 pt-4 text-sm">
                 <div className="flex justify-between text-gray-300"><span>Subtotal</span><span>Rs. {subtotal}</span></div>
@@ -713,6 +755,107 @@ const StaffDashboard = () => {
                   <Printer size={18} /> Print Draft Bill
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {selectedTab === 'internal' && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+            <div className="glass-card rounded-lg border border-red-900 p-5">
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold text-white">Internal Staff Order</h2>
+                <p className="mt-1 text-sm text-gray-400">Employee purchases with staff discount and internal billing.</p>
+              </div>
+              <div className="grid max-h-[520px] grid-cols-2 gap-3 overflow-y-auto pr-1 md:grid-cols-3 xl:grid-cols-4">
+                {products.map((product) => (
+                  <button
+                    key={product._id}
+                    onClick={() => addPosItem(product)}
+                    disabled={!product.inStock}
+                    className="min-h-28 rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-left transition hover:border-red-700 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <p className="line-clamp-2 text-sm font-bold text-white">{product.name}</p>
+                    <p className="mt-1 text-xs text-gray-500">{product.category}</p>
+                    <p className="mt-3 text-lg font-black text-red-300">Rs. {product.price}</p>
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-6">
+                <h3 className="mb-3 text-lg font-bold text-white">Staff Order History</h3>
+                <div className="space-y-3">
+                  {staffOrders.length === 0 ? (
+                    <p className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm text-gray-400">No staff orders yet.</p>
+                  ) : staffOrders.slice(0, 6).map((order) => (
+                    <div key={order._id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-widest text-bakery-gold">Internal Bill #{order._id?.slice(-6)?.toUpperCase()}</p>
+                          <p className="mt-1 font-bold text-white">{order.user?.name || order.guestName || 'Staff'}</p>
+                        </div>
+                        <p className="text-lg font-black text-red-300">Rs. {order.totalAmount}</p>
+                      </div>
+                      <p className="mt-2 text-xs text-gray-400">
+                        Employee ID: {order.employeeId || 'N/A'} | Discount: {order.staffDiscountPercentage || 0}% | {new Date(order.createdAt).toLocaleString('en-IN')}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-card h-fit rounded-lg border border-red-900 p-5">
+              <h3 className="text-xl font-bold text-white">Internal Bill</h3>
+              <div className="mt-4 grid gap-3">
+                <input
+                  value={employeeId}
+                  onChange={(event) => setEmployeeId(event.target.value)}
+                  className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white"
+                  placeholder={`Employee ID (${user?._id?.slice(-8)?.toUpperCase() || 'auto'})`}
+                />
+                <input
+                  type="number"
+                  min="0"
+                  max={user?.role === 'admin' ? 100 : 25}
+                  value={staffDiscountPercent}
+                  onChange={(event) => setStaffDiscountPercent(event.target.value)}
+                  className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white"
+                  placeholder="Staff discount %"
+                />
+              </div>
+
+              <div className="my-4 max-h-72 space-y-3 overflow-y-auto">
+                {posCart.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-gray-500">No items added</p>
+                ) : posCart.map((item) => (
+                  <div key={item._id} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3">
+                    <div className="flex justify-between gap-3">
+                      <p className="text-sm font-bold text-white">{item.name}</p>
+                      <button onClick={() => updatePosQty(item._id, -item.quantity)} className="text-red-300">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => updatePosQty(item._id, -1)} className="rounded bg-zinc-800 p-1"><Minus size={14} /></button>
+                        <span className="w-8 text-center font-bold text-white">{item.quantity}</span>
+                        <button onClick={() => updatePosQty(item._id, 1)} className="rounded bg-zinc-800 p-1"><Plus size={14} /></button>
+                      </div>
+                      <p className="font-bold text-red-300">Rs. {item.price * item.quantity}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 border-t border-zinc-800 pt-4 text-sm">
+                <div className="flex justify-between text-gray-300"><span>Subtotal</span><span>Rs. {subtotal}</span></div>
+                <div className="flex justify-between text-gray-300"><span>Staff Discount</span><span>Rs. {Math.round((subtotal * Number(staffDiscountPercent || 0)) / 100)}</span></div>
+                <div className="flex justify-between text-xl font-black text-white"><span>Total</span><span>Rs. {Math.round(Math.max(0, subtotal - (subtotal * Number(staffDiscountPercent || 0)) / 100))}</span></div>
+              </div>
+
+              <button onClick={handleCreateStaffOrder} className="mt-5 w-full rounded-lg bg-red-700 py-3 font-bold text-white transition hover:bg-red-800">
+                Place Internal Order
+              </button>
             </div>
           </div>
         )}

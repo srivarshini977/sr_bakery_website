@@ -3,6 +3,7 @@ import { AuthContext } from '../context/AuthContext';
 import AdminLayout from '../components/AdminLayout';
 import AdminAnalytics from '../components/AdminAnalytics';
 import MasterManagement from '../components/MasterManagement';
+import DateWiseOrderDashboard from '../components/DateWiseOrderDashboard';
 import axios from 'axios';
 import { AlertTriangle, Download, MapPin, Printer, RefreshCw, Save, Search } from 'lucide-react';
 
@@ -31,6 +32,8 @@ const AdminDashboard = () => {
   const [productsSaving, setProductsSaving] = useState(false);
   const [productDirtyIds, setProductDirtyIds] = useState(() => new Set());
   const [contactSubmissions, setContactSubmissions] = useState([]);
+  const [customerFeedback, setCustomerFeedback] = useState([]);
+  const [staffDailyReport, setStaffDailyReport] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [systemHealth, setSystemHealth] = useState(null);
   const [reportStartDate, setReportStartDate] = useState('');
@@ -149,6 +152,28 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchCustomerFeedback = async () => {
+    try {
+      const response = await axios.get('/api/reviews/admin', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCustomerFeedback(response.data.data?.reviews || []);
+    } catch (error) {
+      console.error('Error fetching customer feedback:', error);
+    }
+  };
+
+  const fetchStaffDailyReport = async () => {
+    try {
+      const response = await axios.get('/api/staff/orders/internal/report/daily', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setStaffDailyReport(response.data.data || null);
+    } catch (error) {
+      console.error('Error fetching staff daily report:', error);
+    }
+  };
+
   const fetchSystemHealth = async () => {
     try {
       const response = await axios.get('/api/health');
@@ -188,6 +213,8 @@ const AdminDashboard = () => {
       fetchInventory();
       fetchProducts();
       fetchContactSubmissions();
+      fetchCustomerFeedback();
+      fetchStaffDailyReport();
       fetchSystemHealth();
       fetchInvoices();
     }
@@ -212,6 +239,12 @@ const AdminDashboard = () => {
       fetchContactSubmissions();
       fetchSystemHealth();
       fetchDeliverySettings();
+    }
+    if (activeSection === 'feedback' && token) {
+      fetchCustomerFeedback();
+    }
+    if (activeSection === 'staff' && token) {
+      fetchStaffDailyReport();
     }
     if (activeSection === 'invoices' && token) {
       fetchInvoices();
@@ -396,6 +429,31 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleFeedbackApproval = async (id, approved) => {
+    try {
+      await axios.patch(`/api/reviews/admin/${id}/approval`, { approved }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchCustomerFeedback();
+    } catch (error) {
+      console.error('Error updating feedback approval:', error);
+      alert('Failed to update feedback approval');
+    }
+  };
+
+  const handleDeleteFeedback = async (id) => {
+    if (!window.confirm('Delete this feedback?')) return;
+    try {
+      await axios.delete(`/api/reviews/admin/${id}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchCustomerFeedback();
+    } catch (error) {
+      console.error('Error deleting feedback:', error);
+      alert('Failed to delete feedback');
+    }
+  };
+
   const handleDeliverySettingChange = (field, value) => {
     setDeliverySettings((settings) => ({ ...settings, [field]: value }));
   };
@@ -474,19 +532,23 @@ const AdminDashboard = () => {
             <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
             <p className="text-sm text-gray-400 mt-1 capitalize">{activeSection} management</p>
           </div>
-          <button
-            onClick={() => {
-              fetchOrders();
-              fetchInventory();
-            }}
-            className="flex items-center gap-2 bg-red-700 hover:bg-red-800 px-4 py-2 rounded-lg text-white transition"
-          >
-            <RefreshCw size={18} /> Refresh
-          </button>
+          {activeSection !== 'date-orders' && (
+            <button
+              onClick={() => {
+                fetchOrders();
+                fetchInventory();
+              }}
+              className="flex items-center gap-2 bg-red-700 hover:bg-red-800 px-4 py-2 rounded-lg text-white transition"
+            >
+              <RefreshCw size={18} /> Refresh
+            </button>
+          )}
         </div>
 
         {/* Analytics Section */}
         {(activeSection === 'dashboard' || activeSection === 'analytics') && <AdminAnalytics orders={orders} />}
+
+        {activeSection === 'date-orders' && <DateWiseOrderDashboard />}
 
         {activeSection === 'master' && <MasterManagement />}
 
@@ -556,13 +618,57 @@ const AdminDashboard = () => {
                 </div>
               )}
             </div>
+
+            <div className="glass-card rounded-lg p-5">
+              <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Daily Staff Consumption</h2>
+                  <p className="text-sm text-gray-400">Internal staff purchases and discount totals for today.</p>
+                </div>
+                <button
+                  onClick={fetchStaffDailyReport}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-4 py-2 text-white hover:bg-zinc-700"
+                >
+                  <RefreshCw size={16} /> Refresh Report
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                  <p className="text-sm text-gray-400">Staff Orders Today</p>
+                  <p className="mt-1 text-2xl font-black text-white">{staffDailyReport?.ordersCount || 0}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                  <p className="text-sm text-gray-400">Staff Billing Total</p>
+                  <p className="mt-1 text-2xl font-black text-white">Rs. {staffDailyReport?.totalAmount || 0}</p>
+                </div>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                  <p className="text-sm text-gray-400">Staff Discount Given</p>
+                  <p className="mt-1 text-2xl font-black text-white">Rs. {staffDailyReport?.totalDiscount || 0}</p>
+                </div>
+              </div>
+              <div className="mt-5 space-y-3">
+                {(staffDailyReport?.employees || []).length === 0 ? (
+                  <p className="rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm text-gray-400">No staff purchases today.</p>
+                ) : staffDailyReport.employees.map((employee) => (
+                  <div key={employee.employeeId || employee.name} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-bold text-white">{employee.name}</p>
+                        <p className="text-xs text-gray-500">Employee ID: {employee.employeeId || 'N/A'} | Orders: {employee.orders}</p>
+                      </div>
+                      <p className="font-black text-red-300">Rs. {employee.totalAmount}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Orders Section */}
+        {/* Live Orders Section */}
         {activeSection === 'orders' && <div className="glass-card p-6 rounded-lg">
           <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <h2 className="text-2xl font-bold text-white">Orders Management</h2>
+            <h2 className="text-2xl font-bold text-white">Live Orders Management</h2>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="flex flex-wrap gap-2">
                 {orderViewTabs.map((tab) => (
@@ -1065,6 +1171,65 @@ const AdminDashboard = () => {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {activeSection === 'feedback' && (
+          <div className="glass-card rounded-lg p-5">
+            <div className="mb-5 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Feedback Management</h2>
+                <p className="text-sm text-gray-400">Only approved customer feedback is displayed on the homepage.</p>
+              </div>
+              <button onClick={fetchCustomerFeedback} className="inline-flex items-center justify-center gap-2 rounded-lg bg-zinc-800 px-4 py-2 text-white hover:bg-zinc-700">
+                <RefreshCw size={16} /> Refresh Feedback
+              </button>
+            </div>
+
+            <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-sm text-gray-400">Total Feedback</p>
+                <p className="mt-1 text-2xl font-black text-white">{customerFeedback.length}</p>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-sm text-gray-400">Approved</p>
+                <p className="mt-1 text-2xl font-black text-white">{customerFeedback.filter((item) => item.approved).length}</p>
+              </div>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                <p className="text-sm text-gray-400">Pending Approval</p>
+                <p className="mt-1 text-2xl font-black text-white">{customerFeedback.filter((item) => !item.approved).length}</p>
+              </div>
+            </div>
+
+            {customerFeedback.length === 0 ? (
+              <p className="rounded-lg border border-zinc-800 bg-zinc-950 p-6 text-center text-gray-400">No customer feedback yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {customerFeedback.map((item) => (
+                  <article key={item._id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-widest text-bakery-gold">{item.rating}/5 stars</p>
+                        <h3 className="mt-1 font-bold text-white">{item.user?.name || 'Customer'}</h3>
+                        <p className="mt-1 text-xs text-gray-500">{new Date(item.createdAt).toLocaleString('en-IN')}</p>
+                      </div>
+                      <span className={`w-fit rounded px-3 py-1 text-xs font-bold ${item.approved ? 'bg-green-900 text-green-200' : 'bg-yellow-900 text-yellow-200'}`}>
+                        {item.approved ? 'Approved' : 'Pending'}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-gray-300">{item.comment}</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button onClick={() => handleFeedbackApproval(item._id, !item.approved)} className="rounded bg-red-700 px-3 py-2 text-sm font-bold text-white hover:bg-red-800">
+                        {item.approved ? 'Hide from Site' : 'Approve'}
+                      </button>
+                      <button onClick={() => handleDeleteFeedback(item._id)} className="rounded bg-zinc-800 px-3 py-2 text-sm font-bold text-white hover:bg-zinc-700">
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -4,6 +4,11 @@ import ProductCard from '../components/ProductCard';
 import { AuthContext } from '../context/AuthContext';
 import { srBakeryCategoryOrder, srBakeryMenuNames } from '../data/srBakeryMenu';
 
+const isCustomerMenuProduct = (product) => {
+  const text = [product.name, product.category, product.description].filter(Boolean).join(' ');
+  return !/\b(QA|test|smoke)\b/i.test(text);
+};
+
 const Menu = () => {
   const { t } = useContext(AuthContext);
   const [products, setProducts] = useState([]);
@@ -19,7 +24,7 @@ const Menu = () => {
         setLoading(true);
         setError('');
         const res = await API.get('/products');
-        const fetched = res.data.data.products || [];
+        const fetched = (res.data.data.products || []).filter(isCustomerMenuProduct);
         const exactMenu = fetched.sort((a, b) => {
           const categoryA = srBakeryCategoryOrder.indexOf(a.category);
           const categoryB = srBakeryCategoryOrder.indexOf(b.category);

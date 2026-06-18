@@ -6,6 +6,7 @@ import User from '../models/User.js';
 import KOT from '../models/KOT.js';
 import { protect, restrictTo } from '../middleware/auth.js';
 import { staffWorkstations } from '../data/staffWorkstations.js';
+import { createOrderFromPayload } from '../utils/orderCreation.js';
 
 const router = express.Router();
 
@@ -169,6 +170,99 @@ router.get('/orders/assigned/:staffId', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching assigned orders', error: error.message });
+  }
+});
+
+router.get('/orders/internal', async (req, res) => {
+  try {
+    const query = { orderSource: 'staff' };
+    if (req.user.role !== 'admin') {
+      query.user = req.user._id;
+    }
+
+    const orders = await Order.find(query)
+      .populate('user', 'name email phone staffRole')
+      .sort({ createdAt: -1 })
+      .limit(200);
+
+    res.status(200).json({
+      status: 'success',
+      results: orders.length,
+      data: { orders }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching staff internal orders', error: error.message });
+  }
+});
+
+router.post('/orders/internal', async (req, res) => {
+  try {
+    const discount = req.user.role === 'admin'
+      ? Number(req.body.staffDiscountPercentage || 0)
+      : Math.min(25, Number(req.body.staffDiscountPercentage || 10));
+
+    const { order, invoice } = await createOrderFromPayload({
+      ...req.body,
+      userId: req.user._id,
+      guestName: req.user.name,
+      orderType: 'takeaway',
+      orderSource: 'staff',
+      employeeId: req.body.employeeId || req.user._id.toString().slice(-8).toUpperCase(),
+      staffDiscountPercentage: discount,
+      paymentMethod: 'staff_internal'
+    }, req.app);
+
+    res.status(201).json({ status: 'success', data: { order, invoice } });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message || 'Error creating staff order', data: error.data });
+  }
+});
+
+router.get('/orders/internal/report/daily', restrictTo('admin'), async (req, res) => {
+  try {
+    const date = req.query.date ? new Date(req.query.date) : new Date();
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+
+    const orders = await Order.find({
+      orderSource: 'staff',
+      createdAt: { $gte: start, $lt: end }
+    }).populate('user', 'name email staffRole');
+
+    const totalAmount = orders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+    const totalDiscount = orders.reduce((sum, order) => sum + Number(order.staffDiscountAmount || 0), 0);
+    const employeeMap = {};
+    orders.forEach((order) => {
+      const key = order.user?._id?.toString() || order.employeeId || 'unknown';
+      if (!employeeMap[key]) {
+        employeeMap[key] = {
+          employeeId: order.employeeId,
+          name: order.user?.name || order.guestName || 'Staff',
+          orders: 0,
+          totalAmount: 0,
+          totalDiscount: 0
+        };
+      }
+      employeeMap[key].orders += 1;
+      employeeMap[key].totalAmount += Number(order.totalAmount || 0);
+      employeeMap[key].totalDiscount += Number(order.staffDiscountAmount || 0);
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        date: start.toISOString().slice(0, 10),
+        ordersCount: orders.length,
+        totalAmount,
+        totalDiscount,
+        employees: Object.values(employeeMap),
+        orders
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error generating staff daily report', error: error.message });
   }
 });
 

@@ -3,7 +3,44 @@ import { Link, useParams } from 'react-router-dom';
 import { CheckCircle2, Clock, PackageCheck, Search } from 'lucide-react';
 import API from '../utils/api';
 
-const steps = ['Pending', 'Confirmed', 'Preparing', 'Packed', 'Shipped', 'Delivered'];
+const trackingStepsByType = {
+  delivery: [
+    { status: 'Pending', label: 'Order Placed', helper: 'We received your order.' },
+    { status: 'Confirmed', label: 'Confirmed', helper: 'The bakery confirmed it.' },
+    { status: 'Preparing', label: 'Preparing', helper: 'Your items are being prepared.' },
+    { status: 'Packed', label: 'Packed', helper: 'Packed and ready for dispatch.' },
+    { status: 'Shipped', label: 'Out for Delivery', helper: 'Your order is on the way.' },
+    { status: 'Delivered', label: 'Delivered', helper: 'Delivered to your address.' }
+  ],
+  takeaway: [
+    { status: 'Pending', label: 'Order Placed', helper: 'We received your order.' },
+    { status: 'Confirmed', label: 'Confirmed', helper: 'The bakery confirmed it.' },
+    { status: 'Preparing', label: 'Preparing', helper: 'Your items are being prepared.' },
+    { status: 'Packed', label: 'Ready for Pickup', helper: 'Collect it from the counter.' },
+    { status: 'Delivered', label: 'Collected', helper: 'Picked up from the bakery.' }
+  ],
+  'dine-in': [
+    { status: 'Pending', label: 'Order Placed', helper: 'We received your table order.' },
+    { status: 'Confirmed', label: 'Confirmed', helper: 'The bakery confirmed it.' },
+    { status: 'Preparing', label: 'Preparing', helper: 'Your items are being prepared.' },
+    { status: 'Packed', label: 'Ready to Serve', helper: 'Ready at the counter/kitchen.' },
+    { status: 'Delivered', label: 'Served', helper: 'Served at your table.' }
+  ]
+};
+
+const getTrackingSteps = (order) => {
+  const baseSteps = trackingStepsByType[order?.orderType] || trackingStepsByType.takeaway;
+  if (order?.paymentMethod !== 'reservation') return baseSteps;
+  return baseSteps.map((step, index) => (
+    index === 0 ? { ...step, label: 'Reserved', helper: 'Your order reservation is saved.' } : step
+  ));
+};
+
+const getStepStatus = (order) => {
+  if (order?.status === 'Ready') return 'Packed';
+  if (order?.orderType !== 'delivery' && order?.status === 'Shipped') return 'Packed';
+  return order?.status;
+};
 
 const OrderTracking = () => {
   const { orderId } = useParams();
@@ -12,11 +49,13 @@ const OrderTracking = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const steps = useMemo(() => getTrackingSteps(order), [order]);
   const activeIndex = useMemo(() => {
-    const normalizedStatus = order?.status === 'Ready' ? 'Packed' : order?.status;
-    const index = steps.indexOf(normalizedStatus);
+    if (order?.status === 'Cancelled') return -1;
+    const normalizedStatus = getStepStatus(order);
+    const index = steps.findIndex((step) => step.status === normalizedStatus);
     return index >= 0 ? index : 0;
-  }, [order?.status]);
+  }, [order, steps]);
 
   const fetchOrder = async (id) => {
     if (!id?.trim()) return;
@@ -71,7 +110,7 @@ const OrderTracking = () => {
 
         {order && (
           <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
               <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
                 <p className="text-xs text-gray-500">Order ID</p>
                 <p className="font-bold text-white break-all">{order._id}</p>
@@ -85,18 +124,29 @@ const OrderTracking = () => {
                 <p className="font-bold text-white">{order.paymentStatus}</p>
               </div>
               <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
+                <p className="text-xs text-gray-500">Order Type</p>
+                <p className="font-bold capitalize text-white">{order.orderType || 'takeaway'}</p>
+              </div>
+              <div className="bg-zinc-900 rounded-lg p-4 border border-zinc-800">
                 <p className="text-xs text-gray-500">Total</p>
                 <p className="font-black text-red-300">Rs. {order.totalAmount}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            {order.status === 'Cancelled' && (
+              <p className="rounded-lg border border-red-900 bg-red-950 p-4 font-bold text-red-200">
+                This order has been cancelled.
+              </p>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-5 xl:grid-cols-6">
               {steps.map((step, index) => {
                 const done = index <= activeIndex;
                 return (
-                  <div key={step} className={`rounded-lg p-4 border ${done ? 'border-green-700 bg-green-950/40' : 'border-zinc-800 bg-zinc-900'}`}>
+                  <div key={step.status} className={`rounded-lg p-4 border ${done ? 'border-green-700 bg-green-950/40' : 'border-zinc-800 bg-zinc-900'}`}>
                     {done ? <CheckCircle2 className="text-green-400 mb-3" /> : <Clock className="text-gray-500 mb-3" />}
-                    <p className={`font-bold ${done ? 'text-white' : 'text-gray-500'}`}>{step}</p>
+                    <p className={`font-bold ${done ? 'text-white' : 'text-gray-500'}`}>{step.label}</p>
+                    <p className={`mt-1 text-xs ${done ? 'text-gray-300' : 'text-gray-600'}`}>{step.helper}</p>
                   </div>
                 );
               })}

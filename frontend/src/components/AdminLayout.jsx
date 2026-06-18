@@ -1,14 +1,16 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Boxes, FileText, Home, Inbox, LayoutDashboard, Package, Receipt, Settings, ShoppingBag, SlidersHorizontal, Users } from 'lucide-react';
+import { BarChart3, Boxes, CalendarDays, FileText, Home, Inbox, LayoutDashboard, MessageSquare, Package, Receipt, Settings, ShoppingBag, SlidersHorizontal, Users } from 'lucide-react';
 
 const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'date-orders', label: 'Date Orders', icon: CalendarDays },
   { id: 'master', label: 'Master Management', icon: SlidersHorizontal },
-  { id: 'orders', label: 'Orders', icon: ShoppingBag },
+  { id: 'orders', label: 'Live Orders', icon: ShoppingBag },
   { id: 'products', label: 'Products', icon: Package },
   { id: 'inventory', label: 'Inventory', icon: Boxes },
   { id: 'staff', label: 'Staff', icon: Users },
+  { id: 'feedback', label: 'Feedback', icon: MessageSquare },
   { id: 'messages', label: 'Messages', icon: Inbox },
   { id: 'invoices', label: 'Invoices', icon: Receipt },
   { id: 'reports', label: 'Reports', icon: FileText },

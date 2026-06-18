@@ -106,12 +106,6 @@ router.get('/track/:id', async (req, res) => {
   }
 });
 
-router.post('/razorpay-verification', async (req, res) => {
-  res.status(410).json({
-    message: 'This verification endpoint is retired. Use /api/razorpay/verify-payment for signed Razorpay verification.'
-  });
-});
-
 // GET ACTIVE ORDERS FOR KITCHEN DISPLAY SYSTEM (KDS)
 router.get('/kds/queue', protect, async (req, res) => {
   try {

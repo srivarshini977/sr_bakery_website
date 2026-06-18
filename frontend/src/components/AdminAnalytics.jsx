@@ -4,7 +4,7 @@ import {
   Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis
 } from 'recharts';
-import { AlertTriangle, CheckCircle2, ShoppingBag, Star, TrendingDown, TrendingUp, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, MessageSquare, PackageCheck, ShoppingBag, Star, TrendingDown, TrendingUp, Users, Wallet } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import API from '../utils/api';
 
@@ -73,10 +73,14 @@ const AdminAnalytics = () => {
   const feedback = analytics?.feedback || {};
 
   const summaryCards = [
-    { label: "Today's Revenue", value: summary.todayRevenue, money: true, icon: Wallet, trend: summary.trends?.todayRevenue },
     { label: "Today's Orders", value: summary.todayOrders, icon: ShoppingBag, trend: summary.trends?.todayOrders },
-    { label: "Today's Profit", value: summary.todayProfit, money: true, icon: TrendingUp, trend: summary.trends?.todayProfit },
-    { label: "Today's Top Product", text: summary.todayTopProduct || 'No sales yet', icon: Star },
+    { label: 'Revenue Today', value: summary.todayRevenue, money: true, icon: Wallet, trend: summary.trends?.todayRevenue },
+    { label: 'Monthly Revenue', value: summary.monthlyRevenue, money: true, icon: TrendingUp },
+    { label: 'Popular Item', text: summary.todayTopProduct || 'No sales yet', icon: Star },
+    { label: 'Pending Orders', value: summary.pendingOrders, icon: AlertTriangle },
+    { label: 'Completed Orders', value: summary.completedOrders, icon: PackageCheck },
+    { label: 'Feedback Count', value: summary.feedbackCount, icon: MessageSquare },
+    { label: 'Staff Orders Today', value: summary.staffOrdersToday, icon: Users },
     { label: 'Total Customers', value: summary.totalCustomers, icon: Users, trend: summary.trends?.totalCustomers },
     { label: 'Active Orders', value: summary.activeOrders, icon: ShoppingBag },
     { label: 'Delivered Orders', value: summary.deliveredOrders, icon: CheckCircle2 },

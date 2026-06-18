@@ -1,10 +1,10 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
-import { LocateFixed, MapPin, Truck } from 'lucide-react';
+import { CreditCard, LocateFixed, MapPin, Truck } from 'lucide-react';
 
-const loadRazorpayScript = () => new Promise((resolve) => {
+const loadRazorpayCheckout = () => new Promise((resolve, reject) => {
   if (window.Razorpay) {
     resolve(true);
     return;
@@ -13,7 +13,7 @@ const loadRazorpayScript = () => new Promise((resolve) => {
   const script = document.createElement('script');
   script.src = 'https://checkout.razorpay.com/v1/checkout.js';
   script.onload = () => resolve(true);
-  script.onerror = () => resolve(false);
+  script.onerror = () => reject(new Error('Unable to load Razorpay Checkout. Check your internet connection.'));
   document.body.appendChild(script);
 });
 
@@ -23,7 +23,7 @@ const Checkout = () => {
   const [loading, setLoading] = useState(false);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [orderType, setOrderType] = useState('takeaway');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState('cash_counter');
   const [address, setAddress] = useState({
     houseNumber: '',
     street: '',
@@ -49,6 +49,24 @@ const Checkout = () => {
   const mapEmbedUrl = deliveryResult?.bakeryLocation && deliveryResult?.customerLatitude && deliveryResult?.customerLongitude
     ? `https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(deliveryResult.bakeryLocation.longitude, deliveryResult.customerLongitude) - 0.03}%2C${Math.min(deliveryResult.bakeryLocation.latitude, deliveryResult.customerLatitude) - 0.03}%2C${Math.max(deliveryResult.bakeryLocation.longitude, deliveryResult.customerLongitude) + 0.03}%2C${Math.max(deliveryResult.bakeryLocation.latitude, deliveryResult.customerLatitude) + 0.03}&layer=mapnik&marker=${deliveryResult.customerLatitude}%2C${deliveryResult.customerLongitude}`
     : '';
+  const paymentOptions = useMemo(() => {
+    const options = [
+      { value: 'razorpay_upi', label: 'Pay by UPI', helper: 'Use UPI ID, app, QR or collect request through Razorpay.' },
+      { value: 'razorpay', label: 'Card / Netbanking / Wallet', helper: 'Pay securely by card, net banking, wallet or pay later.' },
+      { value: 'cash_counter', label: 'Cash at Counter', helper: 'Pay when you collect your order.' },
+      { value: 'reservation', label: 'Order Reservation', helper: 'Reserve now and pay at the bakery counter.' }
+    ];
+    if (orderType === 'delivery' && deliveryResult?.deliveryAvailable) {
+      options.splice(1, 0, { value: 'cash_on_delivery', label: 'Cash on Delivery', helper: 'Pay cash when your order is delivered.' });
+    }
+    return options;
+  }, [deliveryResult?.deliveryAvailable, orderType]);
+
+  useEffect(() => {
+    if (!paymentOptions.some((item) => item.value === paymentMethod)) {
+      setPaymentMethod(paymentOptions[0]?.value || 'cash_counter');
+    }
+  }, [paymentMethod, paymentOptions]);
 
   const handleAddressChange = (field, value) => {
     setAddress((current) => ({ ...current, [field]: value }));
@@ -144,74 +162,6 @@ const Checkout = () => {
     customerLongitude: location.longitude || deliveryResult?.customerLongitude || undefined
   });
 
-  const handleRazorpayPayment = async (orderPayload) => {
-    const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded) {
-      throw new Error('Unable to load Razorpay checkout. Check your internet connection and try again.');
-    }
-
-    const gatewayOrder = await API.post('/razorpay/create-order', {
-      amount: payableTotal,
-      currency: 'INR'
-    });
-    const paymentOrder = gatewayOrder.data.data;
-
-    return new Promise((resolve, reject) => {
-      const razorpay = new window.Razorpay({
-        key: paymentOrder.keyId,
-        amount: paymentOrder.amount,
-        currency: paymentOrder.currency,
-        name: 'SR Bakery',
-        description: `Order total Rs. ${payableTotal}`,
-        order_id: paymentOrder.razorpayOrderId,
-        prefill: {
-          name: user?.name || '',
-          email: user?.email || '',
-          contact: user?.phone || ''
-        },
-        notes: {
-          orderType,
-          customerId: user?._id || ''
-        },
-        handler: async (response) => {
-          try {
-            const verification = await API.post('/razorpay/verify-payment', {
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-              orderPayload
-            });
-            resolve(verification.data.data);
-          } catch (error) {
-            reject(error);
-          }
-        },
-        modal: {
-          ondismiss: async () => {
-            await API.post('/razorpay/payment-failed', {
-              razorpayOrderId: paymentOrder.razorpayOrderId,
-              reason: 'Customer closed payment popup'
-            }).catch(() => {});
-            reject(new Error('Payment was cancelled.'));
-          }
-        },
-        theme: {
-          color: '#dc0000'
-        }
-      });
-
-      razorpay.on('payment.failed', async (response) => {
-        await API.post('/razorpay/payment-failed', {
-          razorpayOrderId: paymentOrder.razorpayOrderId,
-          reason: response.error?.description || 'Payment failed'
-        }).catch(() => {});
-        reject(new Error(response.error?.description || 'Payment failed. Please try again.'));
-      });
-
-      razorpay.open();
-    });
-  };
-
   const handlePlaceOrder = async () => {
     if (!user || user.role !== 'customer') {
       navigate('/login');
@@ -228,11 +178,77 @@ const Checkout = () => {
     setLoading(true);
     try {
       const orderPayload = buildOrderPayload();
-      if (paymentMethod === 'razorpay') {
-        const paymentResult = await handleRazorpayPayment(orderPayload);
-        const createdOrder = paymentResult?.order;
+      if (paymentMethod === 'razorpay' || paymentMethod === 'razorpay_upi') {
+        const isUpiOnly = paymentMethod === 'razorpay_upi';
+        await loadRazorpayCheckout();
+        const gatewayOrder = await API.post('/razorpay/create-order', {
+          amount: payableTotal,
+          currency: 'INR'
+        });
+        const razorpayOrder = gatewayOrder.data.data?.razorpayOrder;
+        const key = import.meta.env.VITE_RAZORPAY_KEY_ID || gatewayOrder.data.data?.keyId;
+        if (!key) {
+          throw new Error('Razorpay key is missing. Set VITE_RAZORPAY_KEY_ID in frontend/.env or RAZORPAY_KEY_ID in backend/.env.');
+        }
+        if (!razorpayOrder?.id) {
+          throw new Error('Unable to create Razorpay payment order.');
+        }
+
+        const paymentResult = await new Promise((resolve, reject) => {
+          const checkout = new window.Razorpay({
+            key,
+            amount: razorpayOrder.amount,
+            currency: razorpayOrder.currency,
+            name: 'SR Bakery',
+            description: `Order payment - Rs. ${payableTotal}`,
+            order_id: razorpayOrder.id,
+            method: {
+              upi: true,
+              card: !isUpiOnly,
+              netbanking: !isUpiOnly,
+              wallet: !isUpiOnly,
+              paylater: !isUpiOnly
+            },
+            config: {
+              display: {
+                blocks: {
+                  upi: {
+                    name: 'Pay by UPI',
+                    instruments: [
+                      { method: 'upi' }
+                    ]
+                  }
+                },
+                sequence: ['block.upi'],
+                preferences: {
+                  show_default_blocks: !isUpiOnly
+                }
+              }
+            },
+            prefill: {
+              name: user?.name || '',
+              email: user?.email || '',
+              contact: user?.phone || ''
+            },
+            theme: { color: '#b91c1c' },
+            handler: resolve,
+            modal: {
+              ondismiss: () => reject(new Error('Payment cancelled.'))
+            }
+          });
+          checkout.on('payment.failed', (response) => {
+            reject(new Error(response.error?.description || 'Payment failed.'));
+          });
+          checkout.open();
+        });
+
+        const verified = await API.post('/razorpay/verify-payment', {
+          ...paymentResult,
+          orderPayload
+        });
+        const createdOrder = verified.data.data?.order;
         clearCart();
-        alert(`Payment Successful\nPayment ID: ${paymentResult?.paymentId}\nOrder Number: ${paymentResult?.orderNumber}`);
+        alert(`Payment successful\nToken Number: ${createdOrder?._id?.slice(-6)?.toUpperCase() || 'Generated'}`);
         if (createdOrder?._id) navigate(`/orders/${createdOrder._id}`);
         return;
       }
@@ -240,7 +256,7 @@ const Checkout = () => {
       const res = await API.post('/orders', orderPayload);
       const createdOrder = res.data.data?.order;
       clearCart();
-      alert('Order placed successfully');
+      alert(`Order placed successfully\nToken Number: ${createdOrder?._id?.slice(-6)?.toUpperCase() || 'Generated at counter'}`);
       if (createdOrder?._id) navigate(`/orders/${createdOrder._id}`);
     } catch (err) {
       console.error('Checkout failed', err);
@@ -344,11 +360,12 @@ const Checkout = () => {
 
           <div className="mt-5 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
             <h2 className="mb-3 font-bold text-white">Payment Method</h2>
+            <div className="mb-3 flex items-center gap-2 text-sm text-gray-300">
+              <CreditCard size={16} className="text-red-300" />
+              <span>Choose online payment or pay later at the bakery.</span>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              {[
-                { value: 'cash', label: 'Cash on Delivery / Counter' },
-                { value: 'razorpay', label: 'Razorpay Online Payment' }
-              ].map((item) => (
+              {paymentOptions.map((item) => (
                 <button
                   key={item.value}
                   type="button"
@@ -359,12 +376,13 @@ const Checkout = () => {
                       : 'border-zinc-700 bg-zinc-900 text-gray-300 hover:bg-zinc-800'
                   }`}
                 >
-                  {item.label}
+                  <span className="block">{item.label}</span>
+                  <span className="mt-1 block text-xs font-medium opacity-80">{item.helper}</span>
                 </button>
               ))}
             </div>
-            {paymentMethod === 'razorpay' && (
-              <p className="mt-3 text-sm text-gray-400">UPI, cards, net banking and wallets open in the Razorpay test checkout.</p>
+            {orderType === 'delivery' && !deliveryResult?.deliveryAvailable && (
+              <p className="mt-3 text-sm text-gray-400">Check delivery availability to enable Cash on Delivery.</p>
             )}
           </div>
         </div>
@@ -382,7 +400,7 @@ const Checkout = () => {
           disabled={loading || cart.length === 0}
           className="mt-5 w-full px-4 py-3 bg-bakery-red text-white rounded font-bold disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Processing...' : paymentMethod === 'razorpay' ? `Pay Rs. ${payableTotal}` : 'Place Order'}
+          {loading ? 'Processing...' : paymentMethod === 'razorpay_upi' ? 'Pay by UPI' : paymentMethod === 'razorpay' ? 'Pay Now' : paymentMethod === 'reservation' ? 'Reserve Order' : 'Place Order'}
         </button>
         </div>
       </div>

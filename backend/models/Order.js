@@ -42,21 +42,40 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'razorpay', 'card'],
-    default: 'cash'
+    enum: ['cash', 'cash_counter', 'cash_on_delivery', 'reservation', 'razorpay', 'staff_internal'],
+    default: 'cash_counter'
+  },
+  razorpayOrderId: {
+    type: String,
+    default: '',
+    index: true
+  },
+  razorpayPaymentId: {
+    type: String,
+    default: '',
+    index: true
   },
   paymentStatus: {
     type: String,
     enum: ['Pending', 'Paid', 'Failed', 'Refunded'],
     default: 'Pending'
   },
-  razorpayOrderId: {
+  orderSource: {
+    type: String,
+    enum: ['customer', 'staff', 'pos'],
+    default: 'customer'
+  },
+  employeeId: {
     type: String,
     default: ''
   },
-  razorpayPaymentId: {
-    type: String,
-    default: ''
+  staffDiscountPercentage: {
+    type: Number,
+    default: 0
+  },
+  staffDiscountAmount: {
+    type: Number,
+    default: 0
   },
   orderType: {
     type: String,
@@ -152,7 +171,7 @@ const orderSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   }
-});
+}, { timestamps: true });
 
 // Update timestamp on save
 orderSchema.pre('save', function(next) {

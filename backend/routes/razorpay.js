@@ -1,20 +1,17 @@
-import express from 'express';
 import crypto from 'crypto';
-import dotenv from 'dotenv';
+import express from 'express';
 import Invoice from '../models/Invoice.js';
 import Order from '../models/Order.js';
 import { protect, restrictTo } from '../middleware/auth.js';
 import { createOrderFromPayload } from '../utils/orderCreation.js';
 
-dotenv.config();
-
 const router = express.Router();
 
-const getRazorpayConfig = () => {
+const getCredentials = () => {
   const keyId = process.env.RAZORPAY_KEY_ID;
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) {
-    const error = new Error('Razorpay credentials are not configured');
+    const error = new Error('Razorpay credentials are missing. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in backend/.env.');
     error.statusCode = 500;
     throw error;
   }
@@ -22,7 +19,7 @@ const getRazorpayConfig = () => {
 };
 
 const razorpayRequest = async (path, options = {}) => {
-  const { keyId, keySecret } = getRazorpayConfig();
+  const { keyId, keySecret } = getCredentials();
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64');
   const response = await fetch(`https://api.razorpay.com/v1${path}`, {
     ...options,
@@ -32,129 +29,123 @@ const razorpayRequest = async (path, options = {}) => {
       ...(options.headers || {})
     }
   });
-  const body = await response.json().catch(() => ({}));
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(body.error?.description || body.message || 'Razorpay request failed');
+    const error = new Error(data.error?.description || 'Razorpay request failed');
     error.statusCode = response.status;
-    error.data = body;
+    error.data = data;
     throw error;
   }
-  return body;
+  return data;
 };
 
 router.post('/create-order', protect, restrictTo('customer'), async (req, res) => {
   try {
-    const { amount, currency = 'INR' } = req.body;
-    const payableAmount = Number(amount);
-    if (!Number.isFinite(payableAmount) || payableAmount <= 0) {
-      return res.status(400).json({ message: 'Valid amount is required' });
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Valid payment amount is required' });
     }
 
-    const { keyId } = getRazorpayConfig();
-    const amountInPaise = Math.round(payableAmount * 100);
+    const { keyId } = getCredentials();
     const razorpayOrder = await razorpayRequest('/orders', {
       method: 'POST',
       body: JSON.stringify({
-        amount: amountInPaise,
-        currency,
-        receipt: `sr_${Date.now()}_${req.user._id.toString().slice(-6)}`,
+        amount: Math.round(amount * 100),
+        currency: req.body.currency || 'INR',
+        receipt: `sr_${Date.now()}`,
         payment_capture: 1,
         notes: {
-          customerId: req.user._id.toString(),
-          source: 'sr-bakery-checkout'
+          source: 'sr_bakery_checkout',
+          userId: req.user._id.toString()
         }
       })
     });
 
-    res.status(200).json({
+    res.status(201).json({
       status: 'success',
       data: {
         keyId,
+        razorpayOrder,
         razorpayOrderId: razorpayOrder.id,
         amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        receipt: razorpayOrder.receipt
+        currency: razorpayOrder.currency
       }
     });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message, data: error.data });
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Unable to create Razorpay order',
+      data: error.data
+    });
   }
 });
 
 router.post('/verify-payment', protect, restrictTo('customer'), async (req, res) => {
   try {
     const {
-      razorpayOrderId,
-      razorpayPaymentId,
-      razorpaySignature,
       orderPayload
     } = req.body;
+    const razorpayOrderId = req.body.razorpay_order_id || req.body.razorpayOrderId;
+    const razorpayPaymentId = req.body.razorpay_payment_id || req.body.razorpayPaymentId;
+    const razorpaySignature = req.body.razorpay_signature || req.body.razorpaySignature;
 
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature || !orderPayload) {
-      return res.status(400).json({ message: 'Payment verification details and order payload are required' });
+      return res.status(400).json({ message: 'Payment verification details are required' });
     }
 
-    const existing = await Order.findOne({
+    const existingOrder = await Order.findOne({
       $or: [
-        { razorpayPaymentId },
-        { razorpayOrderId, paymentStatus: 'Paid' }
+        { razorpayOrderId },
+        { razorpayPaymentId }
       ]
-    }).populate('invoice');
-    if (existing) {
-      return res.status(200).json({
-        status: 'success',
-        message: 'Payment already verified',
-        data: {
-          order: existing,
-          invoice: existing.invoice,
-          paymentId: razorpayPaymentId
-        }
-      });
+    });
+    if (existingOrder) {
+      return res.status(409).json({ message: 'This payment has already been used for an order' });
     }
 
-    const { keySecret } = getRazorpayConfig();
+    const { keySecret } = getCredentials();
     const expectedSignature = crypto
       .createHmac('sha256', keySecret)
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
     if (expectedSignature !== razorpaySignature) {
-      return res.status(400).json({ message: 'Payment signature verification failed' });
-    }
-
-    const gatewayOrder = await razorpayRequest(`/orders/${razorpayOrderId}`, { method: 'GET' });
-    const expectedAmount = Math.round(Number(orderPayload.totalAmount || 0) * 100);
-    if (gatewayOrder.amount !== expectedAmount) {
-      return res.status(400).json({ message: 'Payment amount does not match order total' });
+      return res.status(400).json({ message: 'Invalid Razorpay payment signature' });
     }
 
     const payment = await razorpayRequest(`/payments/${razorpayPaymentId}`, { method: 'GET' });
-    if (!['captured', 'authorized'].includes(payment.status)) {
-      return res.status(400).json({ message: `Payment is ${payment.status}` });
+    if (payment.order_id !== razorpayOrderId || payment.status !== 'captured') {
+      return res.status(400).json({ message: 'Razorpay payment is not captured yet', data: { paymentStatus: payment.status } });
     }
 
-    const { order, invoice } = await createOrderFromPayload({
+    const payload = {
       ...orderPayload,
       userId: req.user._id,
       paymentMethod: 'razorpay'
-    }, req.app, {
+    };
+    const expectedAmount = Math.round(Number(payload.totalAmount || 0) * 100);
+    if (expectedAmount > 0 && Number(payment.amount) !== expectedAmount) {
+      return res.status(400).json({ message: 'Paid amount does not match the order total' });
+    }
+
+    const { order, invoice } = await createOrderFromPayload(payload, req.app, {
       paymentStatus: 'Paid',
       razorpayOrderId,
       razorpayPaymentId
     });
 
-    res.status(200).json({
+    res.status(201).json({
       status: 'success',
-      message: 'Payment Successful',
       data: {
         order,
         invoice,
-        paymentId: razorpayPaymentId,
-        orderNumber: order._id.toString().slice(-6).toUpperCase()
+        paymentStatus: payment.status
       }
     });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message, data: error.data });
+    res.status(error.statusCode || 500).json({
+      message: error.message || 'Unable to verify Razorpay payment',
+      data: error.data
+    });
   }
 });
 

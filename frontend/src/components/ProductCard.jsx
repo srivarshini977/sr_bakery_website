@@ -6,7 +6,7 @@ import { Heart, ShoppingBag } from 'lucide-react';
 import { resolveMediaUrl } from '../utils/media';
 
 const ProductCard = ({ product }) => {
-  const { addToCart, user, wishlist, toggleWishlist, t } = useContext(AuthContext);
+  const { addToCart, user, wishlist, toggleWishlist, removeFromWishlist, t } = useContext(AuthContext);
   const [added, setAdded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ const ProductCard = ({ product }) => {
     setImageFailed(false);
   }, [product._id, product.image, product.imageUrl]);
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!user || user.role !== 'customer') {
       navigate('/login');
       return;
@@ -29,6 +29,13 @@ const ProductCard = ({ product }) => {
     }
 
     if (!addToCart(product)) return;
+    if (wishlist.includes(product._id)) {
+      try {
+        await removeFromWishlist(product._id, { silent: true });
+      } catch (error) {
+        console.error('Unable to remove moved cart item from wishlist:', error);
+      }
+    }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   };

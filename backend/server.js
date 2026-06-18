@@ -14,12 +14,12 @@ import staffRoutes from './routes/staff.js';
 import uploadsRoutes from './routes/uploads.js';
 import reportsRoutes from './routes/reports.js';
 import invoiceRoutes from './routes/invoices.js';
-import razorpayRoutes from './routes/razorpay.js';
 import notificationRoutes from './routes/notifications.js';
 import contactRoutes from './routes/contact.js';
 import reviewRoutes from './routes/reviews.js';
 import masterRoutes from './routes/master.js';
 import wishlistRoutes from './routes/wishlist.js';
+import razorpayRoutes from './routes/razorpay.js';
 import { rateLimiter, securityHeaders } from './middleware/security.js';
 import path from 'path';
 
@@ -60,12 +60,12 @@ app.use('/api/staff', staffRoutes);
 app.use('/api/uploads', uploadsRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/invoices', invoiceRoutes);
-app.use('/api/razorpay', razorpayRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/master', masterRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/razorpay', razorpayRoutes);
 
 // Global Error Handler
 app.use((err, req, res, next) => {

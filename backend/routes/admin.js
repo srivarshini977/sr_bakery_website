@@ -16,10 +16,159 @@ const router = express.Router();
 // Middleware: restrict all routes in this file to ADMIN role
 router.use(protect, restrictTo('admin'));
 
+const getOrderDate = (order) => {
+  if (order.createdAt) return new Date(order.createdAt);
+  if (order.updatedAt) return new Date(order.updatedAt);
+  return order._id?.getTimestamp ? order._id.getTimestamp() : new Date();
+};
+
+const startOfDay = (date) => {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+};
+
+const endOfDay = (date) => {
+  const value = new Date(date);
+  value.setHours(23, 59, 59, 999);
+  return value;
+};
+
+const getDateRange = (query) => {
+  const now = new Date();
+  const filter = query.filter || 'today';
+
+  if (filter === 'yesterday') {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return { start: startOfDay(yesterday), end: endOfDay(yesterday), label: 'Yesterday' };
+  }
+
+  if (filter === 'week') {
+    const start = startOfDay(now);
+    start.setDate(start.getDate() - 6);
+    return { start, end: endOfDay(now), label: 'This Week' };
+  }
+
+  if (filter === 'month') {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { start, end: endOfDay(now), label: 'This Month' };
+  }
+
+  if (filter === 'custom') {
+    const start = query.startDate ? startOfDay(query.startDate) : startOfDay(query.date || now);
+    const end = query.endDate ? endOfDay(query.endDate) : endOfDay(query.date || query.startDate || now);
+    return { start, end, label: 'Custom Range' };
+  }
+
+  const selected = query.date ? new Date(query.date) : now;
+  return { start: startOfDay(selected), end: endOfDay(selected), label: 'Today' };
+};
+
+router.get('/orders/date-dashboard', async (req, res) => {
+  try {
+    const { start, end, label } = getDateRange(req.query);
+    const orders = await Order.find()
+      .populate('user', 'name email phone')
+      .populate('assignedTo', 'name staffRole')
+      .sort({ createdAt: -1 });
+
+    const matchingOrders = orders.filter((order) => {
+      const orderDate = getOrderDate(order);
+      return orderDate >= start && orderDate <= end;
+    });
+
+    const revenueOrders = matchingOrders.filter((order) =>
+      order.paymentStatus === 'Paid' && order.status !== 'Cancelled'
+    );
+    const revenue = revenueOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0);
+    const completedOrders = matchingOrders.filter((order) => order.status === 'Delivered').length;
+    const cancelledOrders = matchingOrders.filter((order) => order.status === 'Cancelled').length;
+    const pendingOrders = matchingOrders.filter((order) =>
+      ['Pending', 'Confirmed', 'Preparing', 'Packed', 'Ready', 'Shipped'].includes(order.status)
+    ).length;
+
+    const productMap = {};
+    matchingOrders
+      .filter((order) => order.status !== 'Cancelled')
+      .forEach((order) => {
+        order.items.forEach((item) => {
+          const key = item.product?.toString() || item.name;
+          if (!productMap[key]) {
+            productMap[key] = { id: key, name: item.name, quantity: 0, revenue: 0 };
+          }
+          productMap[key].quantity += Number(item.quantity || 0);
+          productMap[key].revenue += Number(item.price || 0) * Number(item.quantity || 0);
+        });
+      });
+
+    const topProducts = Object.values(productMap).sort((a, b) => b.quantity - a.quantity);
+    const mostSoldItem = topProducts[0]?.name || 'No sales yet';
+    const chartDays = [];
+    const cursor = startOfDay(start);
+    while (cursor <= end) {
+      chartDays.push({
+        date: cursor.toISOString().slice(0, 10),
+        label: cursor.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        orders: 0,
+        revenue: 0
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    matchingOrders.forEach((order) => {
+      const key = getOrderDate(order).toISOString().slice(0, 10);
+      const bucket = chartDays.find((day) => day.date === key);
+      if (!bucket) return;
+      bucket.orders += 1;
+      if (order.paymentStatus === 'Paid' && order.status !== 'Cancelled') {
+        bucket.revenue += Number(order.totalAmount || 0);
+      }
+    });
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        range: {
+          label,
+          startDate: start.toISOString(),
+          endDate: end.toISOString()
+        },
+        summary: {
+          totalOrders: matchingOrders.length,
+          revenue,
+          completedOrders,
+          pendingOrders,
+          cancelledOrders,
+          mostSoldItem
+        },
+        revenueChart: chartDays,
+        topProducts: topProducts.slice(0, 10),
+        orders: matchingOrders.map((order) => ({
+          _id: order._id,
+          token: order._id.toString().slice(-6).toUpperCase(),
+          customerName: order.user?.name || order.guestName || 'Walk-in Customer',
+          phone: order.user?.phone || '',
+          orderType: order.orderType,
+          orderSource: order.orderSource,
+          items: order.items,
+          totalAmount: order.totalAmount,
+          paymentMethod: order.paymentMethod,
+          paymentStatus: order.paymentStatus,
+          status: order.status,
+          createdAt: getOrderDate(order)
+        }))
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error building date-wise order dashboard', error: error.message });
+  }
+});
+
 // 1. DASHBOARD ANALYTICS & SALES CHARTS DATA
 router.get('/analytics', async (req, res) => {
   try {
-    const orders = await Order.find({ paymentStatus: 'Paid' });
+    const orders = await Order.find({ paymentStatus: 'Paid', orderSource: { $ne: 'staff' } });
     const allOrders = await Order.find();
     const products = await Product.find();
     const customersCount = await User.countDocuments({ role: 'customer' });
@@ -117,9 +266,14 @@ router.get('/analytics', async (req, res) => {
       return itemSum + ((prod?.productionCost || item.price * 0.45) * item.quantity);
     }, 0), 0);
     const percentChange = (current, previous) => previous > 0 ? Number((((current - previous) / previous) * 100).toFixed(1)) : (current > 0 ? 100 : 0);
-    const todayRevenue = revenueFor(todayOrders);
+    const customerTodayOrders = todayOrders.filter((order) => order.orderSource !== 'staff');
+    const staffTodayOrders = todayOrders.filter((order) => order.orderSource === 'staff');
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthOrders = allOrders.filter((order) => orderDate(order) >= startOfMonth && order.orderSource !== 'staff');
+    const todayRevenue = revenueFor(customerTodayOrders);
     const yesterdayRevenue = revenueFor(yesterdayOrders);
-    const todayProfit = todayRevenue - costFor(todayOrders);
+    const todayProfit = todayRevenue - costFor(customerTodayOrders);
     const yesterdayProfit = yesterdayRevenue - costFor(yesterdayOrders);
     const todaySalesMap = {};
     todayOrders.forEach((order) => order.items.forEach((item) => {
@@ -136,16 +290,23 @@ router.get('/analytics', async (req, res) => {
         totalOrders: orders.length,
         dailySummary: {
           todayRevenue,
-          todayOrders: todayOrders.length,
+          todayOrders: customerTodayOrders.length,
           todayProfit,
           todayTopProduct,
           totalCustomers: customersCount,
+          monthlyRevenue: revenueFor(monthOrders),
+          pendingOrders: allOrders.filter(order => ['Pending', 'Confirmed', 'Preparing', 'Packed', 'Ready', 'Shipped'].includes(order.status)).length,
+          completedOrders: allOrders.filter(order => order.status === 'Delivered').length,
+          feedbackCount: totalReviewCount,
+          staffOrdersCount: allOrders.filter(order => order.orderSource === 'staff').length,
+          staffOrdersToday: staffTodayOrders.length,
+          staffConsumptionToday: staffTodayOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0),
           activeOrders: allOrders.filter(order => !['Delivered', 'Cancelled'].includes(order.status)).length,
           deliveredOrders: allOrders.filter(order => order.status === 'Delivered').length,
           cancelledOrders: allOrders.filter(order => order.status === 'Cancelled').length,
           trends: {
             todayRevenue: percentChange(todayRevenue, yesterdayRevenue),
-            todayOrders: percentChange(todayOrders.length, yesterdayOrders.length),
+            todayOrders: percentChange(customerTodayOrders.length, yesterdayOrders.length),
             todayProfit: percentChange(todayProfit, yesterdayProfit),
             totalCustomers: 0,
             activeOrders: 0,

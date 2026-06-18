@@ -6,8 +6,8 @@ export const AuthContext = createContext();
 const dictionary = {
   brandName: 'SR Bakery',
   slogan: 'Fuel on the Fly, Treat with a Smile.',
-  heroHeading: 'Freshly Made Everyday Just For You!',
-  heroSubheading: 'From delicious cakes to traditional sweets, fast food to chats - everything you love!',
+  heroHeading: 'Fresh Cakes Every Day',
+  heroSubheading: 'Traditional Tamil sweets, birthday cakes, chats, fast food, fresh juices and cool drinks from SR Bakery.',
   orderNow: 'Order Now',
   exploreMenu: 'Explore Menu',
   navHome: 'Home',
@@ -191,6 +191,23 @@ export const AuthProvider = ({ children }) => {
     return { ok: true, wishlisted: !isWishlisted };
   };
 
+  const removeFromWishlist = async (productId, options = {}) => {
+    if (!user || user.role !== 'customer') {
+      return { ok: false, message: 'Login to use wishlist' };
+    }
+
+    const response = await API.delete(`/wishlist/remove/${productId}`);
+    const items = response.data.data?.wishlist || [];
+    const ids = items.map((item) => item._id);
+    setWishlistItems(items);
+    setWishlist(ids);
+    localStorage.setItem('sr_bakery_wishlist', JSON.stringify(ids));
+    if (!options.silent) {
+      showToast('Removed from Wishlist');
+    }
+    return { ok: true, wishlist: items };
+  };
+
   const t = (key) => dictionary[key] || key;
 
   return (
@@ -212,6 +229,7 @@ export const AuthProvider = ({ children }) => {
         wishlistItems,
         wishlistCount: wishlist.length,
         toggleWishlist,
+        removeFromWishlist,
         refreshWishlist,
         toast,
         showToast,
