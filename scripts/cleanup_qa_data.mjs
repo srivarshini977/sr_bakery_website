@@ -2,6 +2,7 @@ import mongoose from '../backend/node_modules/mongoose/index.js';
 import Notification from '../backend/models/Notification.js';
 import ContactSubmission from '../backend/models/ContactSubmission.js';
 import Order from '../backend/models/Order.js';
+import Product from '../backend/models/Product.js';
 import User from '../backend/models/User.js';
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/srbakery';
@@ -25,6 +26,14 @@ const contacts = await ContactSubmission.deleteMany({
   ]
 });
 
+const products = await Product.deleteMany({
+  $or: [
+    { name: qaRegex },
+    { category: qaRegex },
+    { description: qaRegex }
+  ]
+});
+
 const users = await User.find({
   $or: [
     { name: qaRegex },
@@ -38,6 +47,7 @@ const deletedUsers = userIds.length > 0 ? await User.deleteMany({ _id: { $in: us
 console.log(JSON.stringify({
   deletedNotifications: notifications.deletedCount,
   deletedContacts: contacts.deletedCount,
+  deletedProducts: products.deletedCount,
   deletedOrders: orders.deletedCount,
   deletedUsers: deletedUsers.deletedCount
 }, null, 2));
